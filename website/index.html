@@ -16,7 +16,7 @@
   <meta property="og:description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=f9735d75">
+  <link rel="stylesheet" href="styles.css?v=31b6c618">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -30,6 +30,7 @@
           <li><a href="#examples">Examples</a></li>
           <li><a href="#delegation">Delegation</a></li>
           <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#developers">Developers</a></li>
           <li><a href="#accountability">Accountability</a></li>
         </ul>
       </nav>
@@ -41,7 +42,10 @@
       <div class="wrap">
         <h1 id="hero-title">Keep sight of what you’re responsible&nbsp;for.</h1>
         <p class="lede">Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.</p>
-        <p class="cta"><a href="#how">See how responsibilities work <span aria-hidden="true">→</span></a></p>
+        <p class="cta">
+          <a class="button" href="https://github.com/vicox/responsibilities#readme">Get started on GitHub</a>
+          <a href="#how">See how it works <span aria-hidden="true">→</span></a>
+        </p>
       </div>
     </section>
 
@@ -101,31 +105,67 @@
         <div class="section-head">
           <p class="eyebrow">04 · Architecture</p>
           <h2 id="architecture-title" class="stacked"><span>Observe deterministically.</span> <span>Judge probabilistically.</span> <span>Remember persistently.</span></h2>
+          <p>Only the judgment is left to an LLM. Your code, the host, observes, acts and remembers. Between judgment and action, the core decides by fixed rules what follows.</p>
         </div>
         <ol class="flow" role="list">
           <li>
             <h3>Observe</h3>
-            <p>Signals run the same queries against the systems of record, every time.</p>
-            <p class="tag">Signals</p>
+            <p>The host reads its systems, such as the support inbox, with the same queries every time. The results are observations.</p>
+            <p class="tag">Host</p>
           </li>
           <li>
             <h3>Judge</h3>
-            <p>A model reads the facts against the expectations and proposes cases with their evidence. Code checks what can be checked exactly.</p>
-            <p class="tag">AI + rules</p>
+            <p>An LLM reads the observations against the expectations and proposes cases, evidence and actions. It changes nothing itself.</p>
+            <p class="tag">LLM</p>
           </li>
           <li>
-            <h3>Remember</h3>
-            <p>Cases keep their history across runs, so each judgment starts from what is already known.</p>
-            <p class="tag">Persistent cases</p>
+            <h3>Decide</h3>
+            <p>The core’s <code>step</code> checks each proposal against fixed rules and returns the transitions, the new state and the action requests. It executes nothing.</p>
+            <p class="tag">Core</p>
+          </li>
+          <li>
+            <h3>Act</h3>
+            <p>The host stores the result, then executes the stored requests. Only new observations confirm what changed.</p>
+            <p class="tag">Host</p>
           </li>
         </ol>
+        <p class="flow-loop"><span aria-hidden="true">↻</span> Then the loop starts again. The next call starts from the stored state, the cases with their evidence; the transitions remain as their history. The core keeps nothing between calls.</p>
+      </div>
+    </section>
+
+    <section id="developers" class="section" aria-labelledby="developers-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">05 · Built for developers</p>
+          <h2 id="developers-title">Four functions. One responsibility lifecycle.</h2>
+          <p>Responsibilities Core is the decision step in that loop, as four pure functions over plain JSON: deterministic TypeScript with no runtime dependencies. The same inputs give byte-identical outputs. It loads, stores, schedules, calls models and executes nothing, and has no clock: your code supplies the time.</p>
+        </div>
+        <dl class="functions">
+          <div class="card">
+            <dt><code>view</code></dt>
+            <dd>What is going on? Prepares what the LLM sees: the observations, the open cases, the expectations and the actions on offer.</dd>
+          </div>
+          <div class="card">
+            <dt><code>step</code></dt>
+            <dd>Does the proposal hold? Checks the LLM’s proposals and returns the transitions, the new state and the action requests.</dd>
+          </div>
+          <div class="card">
+            <dt><code>command</code></dt>
+            <dd>Optional: a person decides. A human override that sets an existing case to open, resolved or dismissed.</dd>
+          </div>
+          <div class="card">
+            <dt><code>assess</code></dt>
+            <dd>Was it a success? Checks a case against its success criteria: met, not met or unknown. Closed is not success.</dd>
+          </div>
+        </dl>
+        <p class="more"><a href="https://github.com/vicox/responsibilities#readme">Read the README on GitHub <span aria-hidden="true">→</span></a></p>
       </div>
     </section>
 
     <section id="accountability" class="section" aria-labelledby="accountability-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">05 · Accountability</p>
+          <p class="eyebrow">06 · Accountability</p>
           <h2 id="accountability-title">Delegating the work does not automatically transfer accountability.</h2>
           <p>People define what should be true and what agents and automations may do on their own. Accountability can change hands through an explicit handover. Every case can be checked against the facts behind it.</p>
           <p>It follows states in the world and runs alongside the work. Its view is only as current and complete as its observations. Steps that can’t be undone still need safeguards before they happen.</p>

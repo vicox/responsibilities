@@ -16,8 +16,8 @@ for.* Plain HTML and CSS: no build step, framework, JavaScript or dependency.
 Assets are linked with relative URLs (`styles.css`, `favicon.svg`, `#examples`,
 `impressum.html`), so the pages work the same at `https://responsibilities.dev/`, under a
 project path such as `https://<user>.github.io/responsibilities.dev/` and on a local server.
-The only absolute URLs are each page's canonical link, the home page's `og:url` and the
-Impressum's `mailto:` contact.
+The only absolute URLs are each page's canonical link, the home page's `og:url`, its links to
+the README on GitHub and the Impressum's `mailto:` contact.
 
 Both pages link the stylesheet as `styles.css?v=<hash>`, the first eight hex digits of the
 SHA-256 of `styles.css`. GitHub Pages lets browsers and its CDN cache files for ten minutes, so
@@ -32,9 +32,11 @@ the checks: they print the link to use.
 The checks cover, on both pages, well-formed markup, one `h1` and no skipped heading levels,
 the meta tags, a link to the Impressum, and that every link resolves (anchors on the other
 page included) and nothing external is loaded; plus the home page's key content (the hero word
-for word, with the title, description and Open Graph tags that repeat it; the three examples
-and their key sentences; the four steps of the delegation story; exactly three steps in
-*Architecture*; the order of the sections), wording that was retired and stays gone, a list of
+for word, with its two calls to action and the title, description and Open Graph tags that
+repeat it; the three examples and their key sentences; the four steps of the delegation story;
+the four steps of *Architecture*, who does each and its key sentence; the four functions and
+the README link in *Built for developers*; the order of the sections), wording that was retired
+and stays gone, a list of
 words the site does not use, the Impressum's required parts, the `CNAME`, and WCAG AA contrast
 of the colour pairs in both colour schemes.
 

@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = "https://responsibilities.dev/"
 PAGES = {"index.html": SITE, "impressum.html": SITE + "impressum.html"}  # page: canonical
+README = "https://github.com/vicox/responsibilities#readme"  # the only external link
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 failures = []
@@ -121,12 +122,13 @@ for name, canonical in PAGES.items():
     check(any(url == "impressum.html" for _, _, url in page.links), f"{name}: no link to impressum.html")
 
     # Links: local URLs are relative, exist and, with a fragment, point at an id that exists;
-    # the only absolute URLs are mailto: and the page's own canonical.
+    # the only absolute URLs are mailto:, the page's own canonical and the README on GitHub.
     for tag, rel, url in page.links:
         if url.startswith("mailto:"):
             continue
         if re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I) or url.startswith("//"):
-            check(url == canonical and rel == "canonical", f"{name}: unexpected absolute URL: {url}")
+            check((url == canonical and rel == "canonical") or (tag == "a" and url == README),
+                  f"{name}: unexpected absolute URL: {url}")
             continue
         path, _, fragment = url.partition("#")
         path = path.split("?")[0]
@@ -139,7 +141,7 @@ for name, canonical in PAGES.items():
             linked = pages.get(target.relative_to(ROOT).as_posix())
             check(linked is not None and fragment in linked[1].ids, f"{name}: anchor {url} has no target")
     absolute = set(re.findall(r"https?://[^\s\"'<>)]+", html))
-    check(absolute <= {SITE, canonical}, f"{name}: external references: {sorted(absolute - {SITE, canonical})}")
+    check(absolute <= {SITE, canonical, README}, f"{name}: external references: {sorted(absolute - {SITE, canonical, README})}")
 
 # The concept page: Open Graph and required content
 html, page = pages["index.html"]
@@ -153,8 +155,12 @@ LEDE_CORE = ("Define what should happen, recognise what needs attention, and fol
              "whether the work is done by people, agents or automations.")
 check(f'<h1 id="hero-title">{H1.replace(" for.", "&nbsp;for.")}</h1>' in html, f"index.html: H1 must be: {H1}")
 check(f'<p class="lede">{LEDE_LEAD} {LEDE_CORE}</p>' in html, "index.html: the hero lede is not verbatim")
-check('<p class="cta"><a href="#how">See how responsibilities work <span aria-hidden="true">→</span></a></p>' in html,
-      "index.html: the hero CTA must read 'See how responsibilities work →' and point to #how")
+# Two CTAs, in order: the README on GitHub, then the explanation on this page
+cta = re.search(r'<p class="cta">(.*?)</p>', html, re.S)
+check(cta and re.findall(r"<a [^>]*>.*?</a>", cta.group(1), re.S) == [
+    f'<a class="button" href="{README}">Get started on GitHub</a>',
+    '<a href="#how">See how it works <span aria-hidden="true">→</span></a>',
+], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See how it works →' (#how)")
 check(page.title == f"{H1[:-1]} · responsibilities.dev", f"index.html: title must repeat the H1: {page.title!r}")
 check(page.meta.get("og:title") == [H1], "index.html: og:title must be the H1")
 check(page.meta.get("description") == [LEDE_CORE], "index.html: meta description must be the lede's second part")
@@ -177,12 +183,12 @@ for phrase in (
     "<span>Observe deterministically.</span>",
     "<span>Judge probabilistically.</span>",
     "<span>Remember persistently.</span>",
-    "<h3>Observe</h3>",
-    '<p class="tag">Signals</p>',
-    "<h3>Judge</h3>",
-    '<p class="tag">AI + rules</p>',
-    "<h3>Remember</h3>",
-    '<p class="tag">Persistent cases</p>',
+    "The core keeps nothing between calls.",
+    '<p class="eyebrow">05 · Built for developers</p>',
+    "Four functions. One responsibility lifecycle.",
+    "pure functions over plain JSON: deterministic TypeScript with no runtime dependencies.",
+    "Optional: a person decides. A human override",
+    "Closed is not success.",
     "Delegating the work does not automatically transfer accountability.",
     "Accountability can change hands through an explicit handover.",
     "Its view is only as current and complete as its observations.",
@@ -213,12 +219,32 @@ check(story and story.group(1).count("<li>") == 4, "index.html: the delegation s
 check(story and "The support system records your reply, and the case closes." in story.group(1),
       "index.html: the story must close its case on the recorded reply")
 
-# Architecture: exactly three steps; the sections in order
+# Architecture: the core's loop in four steps, each with who does it and the sentence that
+# keeps it honest: the LLM only proposes, the core only decides, the host stores before it acts
+# and effects count only once observed
+FLOW = [
+    ("Observe", "Host", "The results are observations."),
+    ("Judge", "LLM", "It changes nothing itself."),
+    ("Decide", "Core", "It executes nothing."),
+    ("Act", "Host", "The host stores the result, then executes the stored requests. Only new observations confirm what changed."),
+]
 flow = re.search(r'<ol class="flow"[^>]*>(.*?)</ol>', html, re.S)
-check(flow and flow.group(1).count("<li>") == 3, "index.html: the flow must have exactly three steps")
-order = [html.find(f'id="{section}"') for section in ("how", "examples", "delegation", "architecture", "accountability")]
+steps = re.findall(r"<li>(.*?)</li>", flow.group(1), re.S) if flow else []
+check(len(steps) == len(FLOW), f"index.html: the flow has {len(steps)} steps, expected {len(FLOW)}")
+for item, (title, tag, sentence) in zip(steps, FLOW):
+    check(f"<h3>{title}</h3>" in item and f'<p class="tag">{tag}</p>' in item and sentence in item,
+          f"index.html: flow step {title} must be done by {tag} and say: {sentence}")
+
+# Built for developers: the four functions, in order, and the README
+functions = re.search(r'<dl class="functions">(.*?)</dl>', html, re.S)
+check(functions and re.findall(r"<dt><code>(\w+)</code></dt>", functions.group(1)) == ["view", "step", "command", "assess"],
+      "index.html: the functions must be view, step, command, assess")
+developers = re.search(r'<section id="developers"(.*?)</section>', html, re.S)
+check(developers and f'href="{README}"' in developers.group(1), "index.html: Built for developers must link the README")
+
+order = [html.find(f'id="{section}"') for section in ("how", "examples", "delegation", "architecture", "developers", "accountability")]
 check(-1 not in order and order == sorted(order),
-      "index.html: sections must be ordered how, examples, delegation, architecture, accountability")
+      "index.html: sections must be ordered how, examples, delegation, architecture, developers, accountability")
 
 # Retired wording stays gone: earlier examples and headings, and phrasings that claimed too much
 for phrase in (
@@ -265,6 +291,7 @@ pairs = [
     ("--muted", "--bg"), ("--muted", "--surface"),
     ("--accent", "--bg"), ("--accent", "--surface"), ("--accent", "--accent-soft"), ("--ink", "--accent-soft"),
     ("--bg", "--ink"),  # skip link
+    ("--bg", "--accent"),  # hero button
 ]
 for theme, colours in themes.items():
     for fg, bg in pairs:

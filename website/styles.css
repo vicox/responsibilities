@@ -203,9 +203,25 @@ h1 {
 }
 
 .cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.75rem;
   margin: 2rem 0 0;
   font-size: 1.05rem;
   font-weight: 600;
+}
+
+.button {
+  padding: 0.7rem 1.25rem;
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.button:hover {
+  text-decoration: underline;
 }
 
 /* Sections */
@@ -327,12 +343,12 @@ h3 {
   color: var(--muted);
 }
 
-/* Flow: observe -> judge -> remember */
+/* Flow: observe -> judge -> decide -> act, then the loop starts again */
 
 .flow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -354,7 +370,7 @@ h3 {
   content: "";
   position: absolute;
   top: 50%;
-  left: -1.95rem;
+  left: -1.7rem;
   width: 0.9rem;
   height: 0.9rem;
   border-top: 3px solid var(--accent);
@@ -377,7 +393,19 @@ h3 {
   font-size: 0.8rem;
 }
 
-@media (max-width: 56rem) {
+.flow-loop {
+  max-width: var(--measure);
+  margin: 2rem 0 0;
+  color: var(--muted);
+}
+
+.flow-loop span {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Four steps need more room than three: stack them earlier */
+@media (max-width: 64rem) {
   .flow {
     grid-template-columns: 1fr;
     gap: 2.75rem;
@@ -387,6 +415,36 @@ h3 {
     top: -1.85rem;
     left: 50%;
     transform: translateX(-50%) rotate(135deg);
+  }
+}
+
+/* Functions: four cards, two by two, stacked on narrow screens */
+
+.functions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 0;
+}
+
+.functions dt {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.functions dd {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+}
+
+.more {
+  margin: 2rem 0 0;
+  font-weight: 600;
+}
+
+@media (max-width: 56rem) {
+  .functions {
+    grid-template-columns: 1fr;
   }
 }
 
