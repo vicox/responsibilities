@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keep sight of what you’re responsible for · responsibilities.dev</title>
+  <meta name="description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
+  <link rel="canonical" href="https://responsibilities.dev/">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111315" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="responsibilities.dev">
+  <meta property="og:url" content="https://responsibilities.dev/">
+  <meta property="og:title" content="Keep sight of what you’re responsible for.">
+  <meta property="og:description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=f9735d75">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./">responsibilities<span>.dev</span></a>
+      <nav aria-label="On this page">
+        <ul role="list">
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#examples">Examples</a></li>
+          <li><a href="#delegation">Delegation</a></li>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#accountability">Accountability</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <h1 id="hero-title">Keep sight of what you’re responsible&nbsp;for.</h1>
+        <p class="lede">Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.</p>
+        <p class="cta"><a href="#how">See how responsibilities work <span aria-hidden="true">→</span></a></p>
+      </div>
+    </section>
+
+    <section id="how" class="section" aria-labelledby="how-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">01 · How responsibilities work</p>
+          <h2 id="how-title">Responsibilities stay. Matters come and go.</h2>
+          <p>A responsibility says what should be true and who answers for it. Within it, each concrete matter that needs attention is a <strong>case</strong>: this customer, waiting for three days; this booking, still unpaid. Attention can mean a review, a decision, accepting something as it is, or an action.</p>
+          <p>Cases come from facts. What the systems show, such as the support inbox or the payment system, is read against what is expected. Actions can change the situation; fresh evidence shows what changed. A case can end without the expected outcome being achieved.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="examples" class="section" aria-labelledby="examples-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">02 · Examples</p>
+          <h2 id="examples-title">Three responsibilities, three kinds of attention.</h2>
+        </div>
+        <ol class="examples" role="list">
+          <li class="card">
+            <h3>Bookings are paid before the event.</h3>
+            <p>The invoicing automation sent the invoice and, by its own measure, succeeded. Ten days before the event the payment system still shows nothing received, so a case opens. A call clarifies it: the customer will pay on Friday. The matter is explained, but not over until the money arrives. If the customer cancels within the terms instead, it is over too, without a payment.</p>
+          </li>
+          <li class="card">
+            <h3>Customers waiting on us get an answer within two working days.</h3>
+            <p>A request has waited three working days, so a case opens. The support system records a reply sent to the customer. That is evidence of an answer; a closed status alone is not. The wait is over, but the two-day target was missed.</p>
+          </li>
+          <li class="card">
+            <h3>A significant revenue decline is understood and owned.</h3>
+            <p>One product’s monthly revenue has been falling for weeks, by an amount that matters. No one made a mistake and no task failed, but someone should understand it. It may be a price change the team chose, and they accept the lower level. It may be customers leaving, and they decide what to do. What ends this case, and what counts as a good outcome, depend on the expectations set beforehand.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="delegation" class="section" aria-labelledby="delegation-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">03 · Delegation</p>
+          <h2 id="delegation-title">Delegate the work. Keep the responsibility.</h2>
+          <p>A responsibility is about the state, not about who works on it, so it holds when the work changes hands. Take the support responsibility above.</p>
+        </div>
+        <ol class="story" role="list">
+          <li>You hand the routine replies to an agent. What you answer for stays the same.</li>
+          <li>On Tuesday the agent runs out of tokens and stops. A customer who has just written in hears nothing.</li>
+          <li>On Thursday the support system still shows the request waiting, whatever the agent reported or didn’t. A case comes to your attention.</li>
+          <li>You reply and raise the agent’s budget. The support system records your reply, and the case closes.</li>
+        </ol>
+        <p class="story-close">You didn’t have to read every reply to catch this. That gives you a basis for handing over more, step by step, and improving the agent as you go.</p>
+      </div>
+    </section>
+
+    <section id="architecture" class="section" aria-labelledby="architecture-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">04 · Architecture</p>
+          <h2 id="architecture-title" class="stacked"><span>Observe deterministically.</span> <span>Judge probabilistically.</span> <span>Remember persistently.</span></h2>
+        </div>
+        <ol class="flow" role="list">
+          <li>
+            <h3>Observe</h3>
+            <p>Signals run the same queries against the systems of record, every time.</p>
+            <p class="tag">Signals</p>
+          </li>
+          <li>
+            <h3>Judge</h3>
+            <p>A model reads the facts against the expectations and proposes cases with their evidence. Code checks what can be checked exactly.</p>
+            <p class="tag">AI + rules</p>
+          </li>
+          <li>
+            <h3>Remember</h3>
+            <p>Cases keep their history across runs, so each judgment starts from what is already known.</p>
+            <p class="tag">Persistent cases</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="accountability" class="section" aria-labelledby="accountability-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">05 · Accountability</p>
+          <h2 id="accountability-title">Delegating the work does not automatically transfer accountability.</h2>
+          <p>People define what should be true and what agents and automations may do on their own. Accountability can change hands through an explicit handover. Every case can be checked against the facts behind it.</p>
+          <p>It follows states in the world and runs alongside the work. Its view is only as current and complete as its observations. Steps that can’t be undone still need safeguards before they happen.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p><span class="brand-text">responsibilities.dev</span> · Keep sight of what you’re responsible for.</p>
+      <a href="impressum.html">Impressum</a>
+    </div>
+  </footer>
+</body>
+</html>
