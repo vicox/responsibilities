@@ -16,40 +16,10 @@
           "accountable": "team:support",
           "expectations": "Every customer inquiry gets a first answer within 24 hours.",
           "include": [
-            "waiting_for_us",
-            "answered"
+            "waiting_for_us"
           ],
-          "closing": [
-            {
-              "description": "The inquiry no longer waits for us.",
-              "rules": [
-                {
-                  "kind": "waiting_for_us",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "condition": "absent",
-                  "scope": "all"
-                }
-              ]
-            }
-          ],
-          "success": [
-            {
-              "description": "The first answer came within 24 hours.",
-              "rules": [
-                {
-                  "kind": "answered",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "where": {
-                    "within_24h": true
-                  }
-                }
-              ]
-            }
-          ]
+          "closing": [],
+          "success": []
         },
         "observations": [
           {
@@ -62,25 +32,15 @@
                 "keys": {
                   "inquiry": "T-1042"
                 }
-              },
-              {
-                "type": "inquiry",
-                "keys": {
-                  "inquiry": "T-1043"
-                }
               }
             ],
-            "complete": true,
             "rows": [
               {
                 "inquiry": "T-1042",
                 "customer": "ACME"
-              },
-              {
-                "inquiry": "T-1043",
-                "customer": "unknown"
               }
-            ]
+            ],
+            "complete": true
           }
         ],
         "offered_actions": [
@@ -95,7 +55,7 @@
         "max_requests": 1,
         "now": "2026-11-02T09:01:00.000Z"
       },
-      "result_digest": "b425614dbf4a5bebb1a5aae72e8f156f8222c085bdc7bc2124af6f47638206e6"
+      "result_digest": "300d577369685a94099a687fd1c91e914ec31d9fd9c157b627ab652061192449"
     },
     {
       "fn": "step",
@@ -112,40 +72,10 @@
           "accountable": "team:support",
           "expectations": "Every customer inquiry gets a first answer within 24 hours.",
           "include": [
-            "waiting_for_us",
-            "answered"
+            "waiting_for_us"
           ],
-          "closing": [
-            {
-              "description": "The inquiry no longer waits for us.",
-              "rules": [
-                {
-                  "kind": "waiting_for_us",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "condition": "absent",
-                  "scope": "all"
-                }
-              ]
-            }
-          ],
-          "success": [
-            {
-              "description": "The first answer came within 24 hours.",
-              "rules": [
-                {
-                  "kind": "answered",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "where": {
-                    "within_24h": true
-                  }
-                }
-              ]
-            }
-          ]
+          "closing": [],
+          "success": []
         },
         "observations": [
           {
@@ -158,25 +88,15 @@
                 "keys": {
                   "inquiry": "T-1042"
                 }
-              },
-              {
-                "type": "inquiry",
-                "keys": {
-                  "inquiry": "T-1043"
-                }
               }
             ],
-            "complete": true,
             "rows": [
               {
                 "inquiry": "T-1042",
                 "customer": "ACME"
-              },
-              {
-                "inquiry": "T-1043",
-                "customer": "unknown"
               }
-            ]
+            ],
+            "complete": true
           }
         ],
         "offered_actions": [
@@ -190,7 +110,7 @@
         ],
         "max_requests": 1,
         "evaluation": {
-          "basis": "4b1fe0b00eb661f8c55068e304c8c96579c2f43df5266928caa18567eb11366d",
+          "basis": "49416a58d87f5c5d772ce25534c154c14d48290616b7caefc4cb56e1e6bfecc0",
           "evaluator": "llm",
           "proposals": [
             {
@@ -204,43 +124,30 @@
               "cites": [
                 "waiting-1"
               ],
-              "title": "ACME waits for an answer",
               "actions": [
                 {
                   "key": "remind",
                   "arguments": {
                     "channel": "#support",
-                    "text": "T-1042 from ACME waits for an answer."
+                    "text": "ACME waits for an answer to T-1042."
                   },
                   "reason": "Nobody has answered yet."
                 }
-              ]
-            },
-            {
-              "subject": {
-                "type": "inquiry",
-                "keys": {
-                  "inquiry": "T-1043"
-                }
-              },
-              "status": "open",
-              "cites": [
-                "waiting-1"
               ]
             }
           ]
         },
         "now": "2026-11-02T09:01:00.000Z"
       },
-      "state_digest": "a0eb551cc3bc70f78d6a81124f04a3ed502946c7285a216d4c8c7ed1bc7ee1ad",
-      "result_digest": "9dca377f2778c4ba158012a2a7ed7560eb0b2d673afecc670333daf72ee65382"
+      "state_digest": "77e79cae681d80a724a91606cafd3e6ed2560e2a2d3abad70e02b3feef730e27",
+      "result_digest": "b6103ef7f9ae379f8220d9b4d22b5ba97c4a02d5af847c853f3601d23c012ce9"
     },
     {
       "fn": "command",
       "args": {
         "definition": {
           "id": "inquiries-answered",
-          "version": 1,
+          "version": 2,
           "identity": {
             "subject_type": "inquiry",
             "subject_keys": [
@@ -250,24 +157,9 @@
           "accountable": "team:support",
           "expectations": "Every customer inquiry gets a first answer within 24 hours.",
           "include": [
-            "waiting_for_us",
-            "answered"
+            "waiting_for_us"
           ],
-          "closing": [
-            {
-              "description": "The inquiry no longer waits for us.",
-              "rules": [
-                {
-                  "kind": "waiting_for_us",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "condition": "absent",
-                  "scope": "all"
-                }
-              ]
-            }
-          ],
+          "closing": [],
           "success": [
             {
               "description": "The first answer came within 24 hours.",
@@ -287,229 +179,21 @@
         },
         "command": {
           "actor": "person:mia",
-          "case_id": "c93a7103f5c9294227512b353be3fee1015f5c5b49f3468157e7dde40d37e3b8",
-          "status": "dismissed",
-          "reason": "Spam."
+          "case_id": "1cc8a18db9fb6e86f3c85267906ed0a48285818d6bd795401b9530c9b50c7f3d",
+          "status": "resolved",
+          "reason": "Answered by email."
         },
-        "now": "2026-11-02T09:30:00.000Z"
+        "now": "2026-11-03T10:00:00.000Z"
       },
-      "state_digest": "981eb6852a97e583d83a2719e58a67084e164fc102e8fc151aba5d72d9a39b5b",
-      "result_digest": "41437262f4278c0490407e85e098776bb9ccb52872ca0e75c4ce75bb782aa3b7"
-    },
-    {
-      "fn": "view",
-      "args": {
-        "definition": {
-          "id": "inquiries-answered",
-          "version": 1,
-          "identity": {
-            "subject_type": "inquiry",
-            "subject_keys": [
-              "inquiry"
-            ]
-          },
-          "accountable": "team:support",
-          "expectations": "Every customer inquiry gets a first answer within 24 hours.",
-          "include": [
-            "waiting_for_us",
-            "answered"
-          ],
-          "closing": [
-            {
-              "description": "The inquiry no longer waits for us.",
-              "rules": [
-                {
-                  "kind": "waiting_for_us",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "condition": "absent",
-                  "scope": "all"
-                }
-              ]
-            }
-          ],
-          "success": [
-            {
-              "description": "The first answer came within 24 hours.",
-              "rules": [
-                {
-                  "kind": "answered",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "where": {
-                    "within_24h": true
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "observations": [
-          {
-            "id": "waiting-2",
-            "kind": "waiting_for_us",
-            "occurred_at": "2026-11-03T10:00:00.000Z",
-            "subjects": [],
-            "rows": [],
-            "complete": true
-          },
-          {
-            "id": "answered-1",
-            "kind": "answered",
-            "occurred_at": "2026-11-03T10:00:00.000Z",
-            "subjects": [
-              {
-                "type": "inquiry",
-                "keys": {
-                  "inquiry": "T-1042"
-                }
-              }
-            ],
-            "rows": [
-              {
-                "inquiry": "T-1042",
-                "within_24h": false
-              }
-            ],
-            "complete": true
-          }
-        ],
-        "offered_actions": [
-          {
-            "key": "remind",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          }
-        ],
-        "max_requests": 1,
-        "now": "2026-11-03T10:01:00.000Z"
-      },
-      "result_digest": "b01c05667cd4bf70f73e98fac6c8dc581078ffc732d62290a7fb57bbbcd1dc2e"
-    },
-    {
-      "fn": "step",
-      "args": {
-        "definition": {
-          "id": "inquiries-answered",
-          "version": 1,
-          "identity": {
-            "subject_type": "inquiry",
-            "subject_keys": [
-              "inquiry"
-            ]
-          },
-          "accountable": "team:support",
-          "expectations": "Every customer inquiry gets a first answer within 24 hours.",
-          "include": [
-            "waiting_for_us",
-            "answered"
-          ],
-          "closing": [
-            {
-              "description": "The inquiry no longer waits for us.",
-              "rules": [
-                {
-                  "kind": "waiting_for_us",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "condition": "absent",
-                  "scope": "all"
-                }
-              ]
-            }
-          ],
-          "success": [
-            {
-              "description": "The first answer came within 24 hours.",
-              "rules": [
-                {
-                  "kind": "answered",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "where": {
-                    "within_24h": true
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "observations": [
-          {
-            "id": "waiting-2",
-            "kind": "waiting_for_us",
-            "occurred_at": "2026-11-03T10:00:00.000Z",
-            "subjects": [],
-            "rows": [],
-            "complete": true
-          },
-          {
-            "id": "answered-1",
-            "kind": "answered",
-            "occurred_at": "2026-11-03T10:00:00.000Z",
-            "subjects": [
-              {
-                "type": "inquiry",
-                "keys": {
-                  "inquiry": "T-1042"
-                }
-              }
-            ],
-            "rows": [
-              {
-                "inquiry": "T-1042",
-                "within_24h": false
-              }
-            ],
-            "complete": true
-          }
-        ],
-        "offered_actions": [
-          {
-            "key": "remind",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          }
-        ],
-        "max_requests": 1,
-        "evaluation": {
-          "basis": "273fc29394bed64173a1587e85e582c46824e962a417f6c70b4a2f0c349ba656",
-          "evaluator": "llm",
-          "proposals": [
-            {
-              "subject": {
-                "type": "inquiry",
-                "keys": {
-                  "inquiry": "T-1042"
-                }
-              },
-              "status": "resolved",
-              "cites": [
-                "waiting-2",
-                "answered-1"
-              ]
-            }
-          ]
-        },
-        "now": "2026-11-03T10:01:00.000Z"
-      },
-      "state_digest": "210994910df532ef3d96cb39b175c71a8f3d6b23badaf1b34ed54e37191956bc",
-      "result_digest": "af5c71c23f36208e61e5a7149ad4399fed0f1da8266b68f82fc7ebf0c22bab07"
+      "state_digest": "6d3776c1c252859077460ca0a6013f4ca5ebf3baf59335350e45460dab815722",
+      "result_digest": "2364ab2b1bd3a2e0d2f974fc6d00e8b93ed3ac6bbd45c36f7e0f64cc7984c50d"
     },
     {
       "fn": "assess",
       "args": {
         "definition": {
           "id": "inquiries-answered",
-          "version": 1,
+          "version": 2,
           "identity": {
             "subject_type": "inquiry",
             "subject_keys": [
@@ -519,24 +203,9 @@
           "accountable": "team:support",
           "expectations": "Every customer inquiry gets a first answer within 24 hours.",
           "include": [
-            "waiting_for_us",
-            "answered"
+            "waiting_for_us"
           ],
-          "closing": [
-            {
-              "description": "The inquiry no longer waits for us.",
-              "rules": [
-                {
-                  "kind": "waiting_for_us",
-                  "match": {
-                    "inquiry": "inquiry"
-                  },
-                  "condition": "absent",
-                  "scope": "all"
-                }
-              ]
-            }
-          ],
+          "closing": [],
           "success": [
             {
               "description": "The first answer came within 24 hours.",
@@ -577,7 +246,7 @@
             "complete": true
           }
         ],
-        "now": "2026-11-03T10:01:00.000Z"
+        "now": "2026-11-03T10:00:00.000Z"
       },
       "result_digest": "fe6eda306583bdb75f6328ff506f73385a773007c98440a384467d9f2e00b9b6"
     }

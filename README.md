@@ -1,13 +1,23 @@
 # responsibilities-core
 
-You write down a Responsibility, such as *every customer inquiry gets a first answer within 24 hours*. Facts arrive as observations, an LLM judges them, and this library decides what follows: which Cases are open, which evidence they rest on, and which actions to request. It is four pure functions over plain JSON. It loads, stores, schedules, calls models and executes nothing; the same inputs give byte-identical outputs.
+Keep sight of what you're responsible for.
 
-## Who does what
+## Why Responsibilities?
 
-- **Host** – your code. Loads observations, stores the state, calls the LLM, executes action requests, supplies `now`.
-- **LLM** – the judge. Reads a `View` and proposes: open or resolve a case, cite evidence, request actions. It changes nothing itself and never dismisses.
-- **Person** – decides explicitly with `command`, for example to dismiss a case. Trusted: no judgment gates.
-- **Core** – this library. Checks every proposal against fixed rules, keeps cases and evidence, and returns what changed and which actions are requested. No I/O, no clock, no execution.
+Customers need answers. Bookings need payment. Important changes need follow-through.
+
+Noticing that something needs attention is the easy part. The hard part is following it through: the alert that fired once and was forgotten, the ticket closed while the customer still waits, the agent that stopped working without anyone noticing. A Responsibility says what should be true and who answers for it, whoever does the work: people, agents or automations. Each matter that needs attention becomes a case. The case stays open until the facts show it is over, or a person decides otherwise. Whether the outcome was good is a separate question, because a case can end without the expected outcome.
+
+## What Responsibilities Core does
+
+This library is the decision step in that loop, as four pure functions over plain JSON:
+
+1. **Observe.** The host, which is your code, loads observations (facts from its systems) and calls `view` to prepare the LLM's context.
+2. **Judge.** An LLM reads the view and proposes: open or resolve a case, cite evidence, request actions. It changes nothing itself and never dismisses.
+3. **Decide.** `step` checks every proposal against fixed rules and returns the new state (the cases and their evidence), the transitions and the action requests. It executes nothing.
+4. **Act.** The host stores the result and executes the requests. Their effects return only as new observations, and the loop starts again.
+
+A person can step in at any point with `command`, and `assess` reports whether a case met its success criteria. The core loads, stores, schedules, calls models and executes nothing, and has no clock: the host supplies `now`. The same inputs give byte-identical outputs.
 
 The words used below:
 
@@ -15,6 +25,92 @@ The words used below:
 - **Observation** – an immutable fact: `id`, `kind`, `occurred_at`, `rows`, and `complete` (the rows are everything the source had).
 - **Case** – one subject under the Responsibility, here one inquiry: `open`, `resolved` or `dismissed`, with linked evidence and an `episode` that counts status changes.
 - **Action request** – an action the host offered and the LLM asked for, checked by the core. The host executes it; its effect returns only as a new observation.
+
+## See it in action
+
+The Responsibility: every customer inquiry gets a first answer within 24 hours. Both blocks run as one test, and `fixtures/example.json` is their recording.
+
+### 1. An inquiry waits: `view` and `step`
+
+One inquiry, one case, one proposal from the LLM, one action request.
+
+```ts
+import { step, view, type Definition, type OfferedAction } from "responsibilities-core";
+
+const definition: Definition = {
+  id: "inquiries-answered",
+  version: 1,
+  identity: { subject_type: "inquiry", subject_keys: ["inquiry"] },  // one case per inquiry
+  accountable: "team:support",
+  expectations: "Every customer inquiry gets a first answer within 24 hours.",
+  include: ["waiting_for_us"],                                       // what the LLM sees
+  closing: [],
+  success: [],                                                       // part 2 adds one
+};
+
+// The host loaded this from its helpdesk: the complete list of inquiries waiting for us.
+const waiting = {
+  id: "waiting-1", kind: "waiting_for_us", occurred_at: "2026-11-02T09:00:00.000Z",
+  subjects: [{ type: "inquiry", keys: { inquiry: "T-1042" } }],
+  rows: [{ inquiry: "T-1042", customer: "ACME" }], complete: true,
+};
+// What the host lets the LLM ask for in this step.
+const offered: OfferedAction[] = [{ key: "remind", params: { channel: "string", text: "string" } }];
+const now = "2026-11-02T09:01:00.000Z";
+
+// view: what is going on? The host sends v to its LLM. (1 = at most one request per step)
+const v = view(definition, null, [waiting], offered, 1, now);
+
+// The LLM answers with a proposal; step checks it and derives what follows.
+const r = step(definition, null, [waiting], offered, 1, {
+  basis: v.basis,                     // the answer is bound to exactly what the LLM saw
+  evaluator: "llm",
+  proposals: [{
+    subject: { type: "inquiry", keys: { inquiry: "T-1042" } },
+    status: "open",
+    cites: ["waiting-1"],             // evidence must come from v
+    actions: [{ key: "remind", arguments: { channel: "#support", text: "ACME waits for an answer to T-1042." },
+                reason: "Nobody has answered yet." }],
+  }],
+}, now);
+
+// r.transitions:     [{ kind: "opened", to: "open", actor: "judge:llm", … }]  a case for T-1042
+// r.action_requests: [{ key: "remind", arguments: { … }, episode: 1, … }]   the host posts it, not the core
+// r.state:           the host stores it; the next call starts from it
+```
+
+### 2. A person closes it, and success is assessed: `command` and `assess`
+
+The next day, Mia from support closes the case. The helpdesk reports that the first answer came after 25 hours. The core computes no business metrics: the host's helpdesk export decides `within_24h`, and the success rule only compares it.
+
+```ts
+import { assess, command } from "responsibilities-core";
+
+// Version 2 of the Responsibility says what a good outcome is.
+const definition2: Definition = { ...definition, version: 2, success: [{
+  description: "The first answer came within 24 hours.",
+  rules: [{ kind: "answered", match: { inquiry: "inquiry" }, where: { within_24h: true } }],
+}] };
+const caseId = r.transitions[0]!.case_id;
+const later = "2026-11-03T10:00:00.000Z";
+
+// command: an explicit human decision, without judgment gates.
+const c = command(definition2, r.state, { actor: "person:mia", case_id: caseId, status: "resolved",
+                                          reason: "Answered by email." }, later);
+
+// assess: the case is closed, but was it a success?
+const answered = {
+  id: "answered-1", kind: "answered", occurred_at: later,
+  subjects: [{ type: "inquiry", keys: { inquiry: "T-1042" } }],
+  rows: [{ inquiry: "T-1042", within_24h: false }], complete: true,
+};
+const a = assess(definition2, c.state, caseId, [answered], later);
+
+// c.transitions: [{ kind: "status_changed", from: "open", to: "resolved", actor: "person:mia", … }]
+// a.result:      "not_met"   closed is not success
+```
+
+The case is over, and its success criterion was not met. The core keeps both facts apart.
 
 ## The four functions
 
@@ -25,94 +121,20 @@ The words used below:
 *Does the LLM's proposal hold?* `evaluation` is `{basis, evaluator, proposals}`, with `basis` copied from the view. Each proposal is taken, taken in part, or rejected with a code; from what is taken follow the new state and the action requests.
 
 **`command(definition, state, {actor: "person:<id>", case_id, status, reason?}, now)` → same as `step`**
-*A person decided.* Sets `open`, `resolved` or `dismissed` on an existing case without judgment gates; `reason` is required for `dismissed`.
+*Optional: a person decides.* Sets `open`, `resolved` or `dismissed` on an existing case without judgment gates; `reason` is required for `dismissed`. The loop does not need it; it is how a person steps in.
 
 **`assess(definition, state, case_id, observations, now)` → `{spec, case_id, result: "met" | "not_met" | "unknown", criteria}`**
 *Was it a success?* Reads the success criteria, with a trace per rule; no success criteria is `unknown`. Writes nothing.
 
-**Closed is not success.** `resolved` means the case is over. When the LLM proposes it, `step` accepts it only if the closing criteria with rules are met (without rules, it needs new evidence); a person's `command` sets it without that check. Whether the outcome was good is a separate question for `assess`: an inquiry answered after 25 hours is resolved and not a success.
+**Closed is not success.** `resolved` means the case is over. When the LLM proposes it, `step` accepts it only if the closing criteria with rules are met (without rules, it needs new evidence); a person's `command` sets it without that check. Whether the outcome was good is the separate question `assess` answers.
 
 All four are synchronous. `state` is `null` before the first step. A contract violation throws `InputError` and returns nothing; a refused proposal is data, a `rejection`. `src/schema.json` (exported as `schema` and as `responsibilities-core/schema.json`) defines every input and output. Also exported: `digest` (`H`), `canonical` (RFC 8785), `SPEC`, `InputError`, the types.
 
-## Example: answer every customer inquiry within 24 hours
+## Integration and reference
 
-This block runs as a test, and `fixtures/example.json` is its recording.
+### Quickstart
 
-```ts
-import { assess, command, digest, step, view, type Definition, type OfferedAction } from "responsibilities-core";
-
-const definition: Definition = {
-  id: "inquiries-answered",
-  version: 1,
-  identity: { subject_type: "inquiry", subject_keys: ["inquiry"] },
-  accountable: "team:support",
-  expectations: "Every customer inquiry gets a first answer within 24 hours.",
-  include: ["waiting_for_us", "answered"],
-  closing: [{
-    description: "The inquiry no longer waits for us.",
-    rules: [{ kind: "waiting_for_us", match: { inquiry: "inquiry" }, condition: "absent", scope: "all" }],
-  }],
-  success: [{
-    description: "The first answer came within 24 hours.",
-    rules: [{ kind: "answered", match: { inquiry: "inquiry" }, where: { within_24h: true } }],
-  }],
-};
-const offered: OfferedAction[] = [{ key: "remind", params: { channel: "string", text: "string" } }];  // the host's choice
-const inquiry = (id: string) => ({ type: "inquiry", keys: { inquiry: id } });
-const caseId = (id: string) => digest({ definition_id: definition.id, subject_type: "inquiry", keys: { inquiry: id } });
-
-// Day 1. The host loads the helpdesk's complete list of inquiries waiting for us.
-const waiting1 = { id: "waiting-1", kind: "waiting_for_us", occurred_at: "2026-11-02T09:00:00.000Z",
-                   subjects: [inquiry("T-1042"), inquiry("T-1043")], complete: true,
-                   rows: [{ inquiry: "T-1042", customer: "ACME" }, { inquiry: "T-1043", customer: "unknown" }] };
-let now = "2026-11-02T09:01:00.000Z";
-
-// view: what is going on? The host gives v1 to its LLM.
-const v1 = view(definition, null, [waiting1], offered, 1, now);
-
-// step: the LLM proposes two cases and a reminder; the core checks and applies them.
-const r1 = step(definition, null, [waiting1], offered, 1, {
-  basis: v1.basis,
-  evaluator: "llm",
-  proposals: [
-    { subject: inquiry("T-1042"), status: "open", cites: ["waiting-1"], title: "ACME waits for an answer",
-      actions: [{ key: "remind", arguments: { channel: "#support", text: "T-1042 from ACME waits for an answer." },
-                  reason: "Nobody has answered yet." }] },
-    { subject: inquiry("T-1043"), status: "open", cites: ["waiting-1"] },
-  ],
-}, now);
-// r1.transitions:     two cases "opened" by "judge:llm"
-// r1.action_requests: [{ key: "remind", episode: 1, id: digest([caseId("T-1042"), "remind", 1]), … }]
-// The host stores r1, then posts the reminder itself. The core never learns that it did.
-
-// command: a person decides that T-1043 is spam.
-const c1 = command(definition, r1.state, { actor: "person:mia", case_id: caseId("T-1043"),
-                                           status: "dismissed", reason: "Spam." }, "2026-11-02T09:30:00.000Z");
-
-// Day 2. T-1042 got its first answer after 25 hours; the helpdesk says so.
-const waiting2 = { id: "waiting-2", kind: "waiting_for_us", occurred_at: "2026-11-03T10:00:00.000Z",
-                   subjects: [], rows: [], complete: true };
-const answered1 = { id: "answered-1", kind: "answered", occurred_at: "2026-11-03T10:00:00.000Z",
-                    subjects: [inquiry("T-1042")], rows: [{ inquiry: "T-1042", within_24h: false }], complete: true };
-now = "2026-11-03T10:01:00.000Z";
-const v2 = view(definition, c1.state, [waiting2, answered1], offered, 1, now);  // v2.open_cases: T-1042 only
-
-// step: the LLM proposes to resolve. The closing rule checks it against waiting-2: met.
-const r2 = step(definition, c1.state, [waiting2, answered1], offered, 1, {
-  basis: v2.basis,
-  evaluator: "llm",
-  proposals: [{ subject: inquiry("T-1042"), status: "resolved", cites: ["waiting-2", "answered-1"] }],
-}, now);
-// r2.transitions: [{ kind: "status_changed", from: "open", to: "resolved", closing_check: { result: "met" }, … }]
-
-// assess: resolved, but was it a success?
-const a = assess(definition, r2.state, caseId("T-1042"), [answered1], now);
-// a.result: "not_met" (answered, but not within 24 hours)
-```
-
-Had the LLM proposed `resolved` while T-1042 was still waiting, `step` would have returned `CLOSING_NOT_MET` and kept the case open. `caseId` works because ids are derived (see [Determinism and replay](#determinism-and-replay)).
-
-## Quickstart
+Run the tests, including both blocks above, and build the library:
 
 ```sh
 npm install
@@ -120,20 +142,48 @@ npm test        # type check, tests, README example, fixture replay (Node ≥ 22
 npm run build   # dist/: ES module and .d.ts, no runtime dependencies
 ```
 
-A host step:
+### Integration pattern
+
+One host step. `askYourLLM` and `yourStore` stand for your own code; the library provides neither.
 
 ```ts
 const v = view(definition, state, observations, offered, maxRequests, now);
-const proposals = await myJudge(v);                // validate against schema.json#/$defs/proposal
+const proposals = await askYourLLM(v);           // validate against schema.json#/$defs/proposal
 const r = step(definition, state, observations, offered, maxRequests,
-               { basis: v.basis, evaluator: "my-judge", proposals }, now);
+               { basis: v.basis, evaluator: "my-llm", proposals }, now);
 // One transaction, and only if the stored state_digest is still `readDigest`:
-await store.commitIf(readDigest, { state: r.state, state_digest: r.state_digest,
-                                   transitions: r.transitions, outbox: r.action_requests });
+await yourStore.commitIf(readDigest, { state: r.state, state_digest: r.state_digest,
+                                       transitions: r.transitions, outbox: r.action_requests });
 // Then execute from the outbox (see Host obligations).
 ```
 
-## What `step` checks
+### Host obligations
+
+1. **Pass `step` exactly the inputs of its `view`**, `now` included. Another `now`, or a state saved in between, gives `BASIS_MISMATCH`. Pass the observations the closing rules read: the core has no lookback.
+2. **Compare and set.** Store the new state only if the stored `state_digest` is still the one read; store it with its transitions and requests in one transaction (outbox). Transitions are the history; the state keeps none.
+3. **Execute only stored requests** – never from a failed save, never from a replay. The core guarantees at most one accepted request per `(case_id, key, episode)` along one state line, and a stable `request_id`; nobody guarantees exactly-once effects. Choose per action:
+   - *at most once*: durably mark `request_id` as started before executing; never execute a started id again.
+   - *at least once*: retry until confirmed; only where the target takes `request_id` as an idempotency key, or a duplicate is acceptable.
+4. **Feed effects back as observations.** The core never learns sent, failed or skipped.
+5. **Validate the LLM's raw output against the schema** first; a non-conforming proposal makes `step` throw.
+6. **Give canonical input.** Strings in NFC; times exactly `YYYY-MM-DDTHH:MM:SS.sssZ`; integers within ±(2^53−1); fractions only in observation rows. The core refuses, it does not normalize. Subject keys compare exactly: `173` ≠ `"173"`, `"Web"` ≠ `"web"`.
+7. **Never change an observation.** The core detects a changed observation only once it is linked as evidence.
+8. **Keep one state per Responsibility.** `now` never goes back.
+
+### Criteria
+
+```js
+{ description: "…", rules: [rule, …] }               // all rules must hold
+{ description: "…", any_of: [{ rules: […] }, …] }    // one route must hold
+{ description: "…" }                                 // closing only: words for the LLM, gates nothing
+// rule:
+{ kind, match: { column: subject_key }, where: { column: value } }   // where is optional
+{ kind, match: { column: subject_key }, condition: "absent", scope: "all" }
+```
+
+A rule reads the latest observation of its `kind` (by `occurred_at`, then `id`) among the observations passed to this call, included or not. `match` joins 1–3 row columns to subject keys, exactly. A presence rule is `met` when a joined row has every `where` value, `not_met` only when the observation is complete and every joined row has another non-null value, otherwise `unknown`: a missing row is never an answer. An `absent` rule (`scope: all`: the observation lists every subject) is `not_met` when a row joins, `met` when the observation is complete and no row could be the subject, otherwise `unknown`. Rules combine as a three-valued AND, routes as OR, criteria as AND. Only one route of an `any_of` may use `absent`. Rules compare values and never compute; a derived fact such as `within_24h` arrives in the observation.
+
+### What `step` checks
 
 1. Every input, or it throws: schema, NFC, times (`now` ≥ `state.now`, nothing occurs after `now`), identity binding, observation conflicts.
 2. `basis`. If `evaluation.basis` differs from the recomputed one, every proposal gets `BASIS_MISMATCH` and the state is returned unchanged, `now` included.
@@ -164,33 +214,7 @@ A transition is `opened`, `status_changed` or `updated`. It names its actor (`ju
 
 Part `proposal`: nothing of it was taken. Part `status`: status, title and summary were not taken (they are in `detail.proposed_title` and `proposed_summary`); new evidence stays linked. Part `action`: only that entry was not taken. An accepted status change increments the episode; a new episode allows each action key once more.
 
-## Criteria
-
-```js
-{ description: "…", rules: [rule, …] }               // all rules must hold
-{ description: "…", any_of: [{ rules: […] }, …] }    // one route must hold
-{ description: "…" }                                 // closing only: words for the LLM, gates nothing
-// rule:
-{ kind, match: { column: subject_key }, where: { column: value } }   // where is optional
-{ kind, match: { column: subject_key }, condition: "absent", scope: "all" }
-```
-
-A rule reads the latest observation of its `kind` (by `occurred_at`, then `id`) among the observations passed to this call, included or not. `match` joins 1–3 row columns to subject keys, exactly. A presence rule is `met` when a joined row has every `where` value, `not_met` only when the observation is complete and every joined row has another non-null value, otherwise `unknown`: a missing row is never an answer. An `absent` rule (`scope: all`: the observation lists every subject) is `not_met` when a row joins, `met` when the observation is complete and no row could be the subject, otherwise `unknown`. Rules combine as a three-valued AND, routes as OR, criteria as AND. Only one route of an `any_of` may use `absent`. Rules compare values and never compute: a deadline such as 24 hours arrives already decided, as in `within_24h`.
-
-## Host obligations
-
-1. **Pass `step` exactly the inputs of its `view`**, `now` included. Another `now`, or a state saved in between, gives `BASIS_MISMATCH`. Pass the observations the closing rules read: the core has no lookback.
-2. **Compare and set.** Store the new state only if the stored `state_digest` is still the one read; store it with its transitions and requests in one transaction (outbox). Transitions are the history; the state keeps none.
-3. **Execute only stored requests** – never from a failed save, never from a replay. The core guarantees at most one accepted request per `(case_id, key, episode)` along one state line, and a stable `request_id`; nobody guarantees exactly-once effects. Choose per action:
-   - *at most once*: durably mark `request_id` as started before executing; never execute a started id again.
-   - *at least once*: retry until confirmed; only where the target takes `request_id` as an idempotency key, or a duplicate is acceptable.
-4. **Feed effects back as observations.** The core never learns sent, failed or skipped.
-5. **Validate the LLM's raw output against the schema** first; a non-conforming proposal makes `step` throw.
-6. **Give canonical input.** Strings in NFC; times exactly `YYYY-MM-DDTHH:MM:SS.sssZ`; integers within ±(2^53−1); fractions only in observation rows. The core refuses, it does not normalize. Subject keys compare exactly: `173` ≠ `"173"`, `"Web"` ≠ `"web"`.
-7. **Never change an observation.** The core detects a changed observation only once it is linked as evidence.
-8. **Keep one state per Responsibility.** `now` never goes back.
-
-## Determinism and replay
+### Determinism and replay
 
 `H(x)` is the SHA-256 hex of the RFC 8785 bytes of `x`, exported as `digest`. All ids are derived:
 
@@ -204,9 +228,11 @@ proposal ref  = H(proposal, with cites sorted and actions ordered by (key, H(arg
 
 The evaluation records the LLM's proposals, so applying the recorded inputs of each `step` and `command` in order reproduces every output byte for byte; each `state_digest` is checked. `test/replay.test.ts` replays the recordings in `fixtures/`: `example.json` is the example above; `actions.json` shows a request, the same key refused as `ACTION_REPEATED` in that episode, the request allowed again after a reopen, and a person's dismissal. Fixtures are bound to `SPEC` (`responsibility-core/0`); `npm run fixtures` re-records them.
 
-## Not in v0
+### Scope
 
-Loading observations, lookback windows, persistence, scheduling, model clients, executing actions, requests by persons, dismissal by the LLM, action conditions and parameter binding, globs and value lists in rules.
+**Outside the core, by design:** loading observations and choosing their time window, storage, scheduling, model calls, executing actions, the clock. These belong to the host. Dismissal belongs to a person, never to the LLM.
+
+**Not in v0:** action requests by persons, conditions and parameter binding for actions, globs and value lists in rules.
 
 ## License
 

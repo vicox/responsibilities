@@ -15,27 +15,24 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 
 test("the README example runs, does what it says, and is the fixture", async () => {
   const readme = readFileSync(join(root, "README.md"), "utf8");
-  const block = /## Example[^\n]*\n[\s\S]*?```ts\n([\s\S]*?)\n```/.exec(readme)?.[1];
-  assert.ok(block, "README has an Example section with a ts block");
-  const source = block.replace('from "responsibilities-core"', `from ${JSON.stringify(pathToFileURL(join(root, "test/recorder.ts")).href)}`);
+  const section = /\n## See it in action\n([\s\S]*?)\n## /.exec(readme)?.[1] ?? "";
+  const blocks = [...section.matchAll(/```ts\n([\s\S]*?)\n```/g)].map((m) => m[1]!);
+  assert.equal(blocks.length, 2, "the See it in action section has two ts blocks, run as one module");
+  const source = blocks.join("\n").replaceAll('from "responsibilities-core"', `from ${JSON.stringify(pathToFileURL(join(root, "test/recorder.ts")).href)}`);
   const file = join(mkdtempSync(join(tmpdir(), "responsibilities-core-")), "example.ts");
   writeFileSync(file, source);
   await import(pathToFileURL(file).href);
 
-  assert.deepEqual(calls.map((c) => c.fn), ["view", "step", "command", "view", "step", "assess"]);
-  const [, r1, c1, v2, r2, a] = calls.map((c) => c.result) as [View, StepResult, StepResult, View, StepResult, Assessment];
-  const caseId = (id: string) => digest({ definition_id: "inquiries-answered", subject_type: "inquiry", keys: { inquiry: id } });
-  const subject = (id: string) => r1.state!.cases[id]!.subject.keys.inquiry;
+  assert.deepEqual(calls.map((c) => c.fn), ["view", "step", "command", "assess"]);
+  const [, r, c, a] = calls.map((call) => call.result) as [View, StepResult, StepResult, Assessment];
+  const caseId = digest({ definition_id: "inquiries-answered", subject_type: "inquiry", keys: { inquiry: "T-1042" } });
 
-  assert.deepEqual(r1.rejections, []);
-  assert.deepEqual(r1.transitions.map((t) => [subject(t.case_id), t.kind, t.actor]).sort(),
-    [["T-1042", "opened", "judge:llm"], ["T-1043", "opened", "judge:llm"]]);
-  assert.deepEqual(r1.action_requests.map((r) => [r.key, r.episode, r.id]), [["remind", 1, digest([caseId("T-1042"), "remind", 1])]]);
-  assert.deepEqual([c1.transitions[0]!.case_id, c1.transitions[0]!.to, c1.transitions[0]!.actor], [caseId("T-1043"), "dismissed", "person:mia"]);
-  assert.deepEqual(v2.open_cases.map((c) => c.case_id), [caseId("T-1042")]);
-  assert.deepEqual(r2.rejections, []);
-  assert.deepEqual([r2.transitions[0]!.kind, r2.transitions[0]!.from, r2.transitions[0]!.to], ["status_changed", "open", "resolved"]);
-  assert.equal(r2.transitions[0]!.closing_check!.result, "met");
+  assert.deepEqual(r.rejections, []);
+  assert.deepEqual(r.transitions.map((t) => [t.case_id, t.kind, t.to, t.actor]), [[caseId, "opened", "open", "judge:llm"]]);
+  assert.deepEqual(r.action_requests.map((x) => [x.case_id, x.key, x.episode]), [[caseId, "remind", 1]]);
+  assert.deepEqual(r.action_requests[0]!.arguments, { channel: "#support", text: "ACME waits for an answer to T-1042." });
+  assert.deepEqual(c.transitions.map((t) => [t.case_id, t.kind, t.from, t.to, t.actor]), [[caseId, "status_changed", "open", "resolved", "person:mia"]]);
+  assert.equal(c.state!.cases[caseId]!.status, "resolved");
   assert.equal(a.result, "not_met");
 
   matchFixture("example.json", calls);
