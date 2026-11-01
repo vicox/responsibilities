@@ -1,0 +1,27 @@
+{
+  "name": "responsibilities-core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "A Responsibility core as pure functions: definition, observations, state and an external judgment in; state, transitions, rejections and action requests out.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema.json": "./dist/schema.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "tsc --noEmit && node --test test/*.test.ts",
+    "fixtures": "UPDATE_FIXTURES=1 node --test test/readme.test.ts test/actions.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
+}

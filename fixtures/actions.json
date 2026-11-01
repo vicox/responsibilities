@@ -1,0 +1,919 @@
+{
+  "spec": "responsibility-core/0",
+  "calls": [
+    {
+      "fn": "view",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-1",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-02T09:00:00.000Z",
+            "subjects": [
+              {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              }
+            ],
+            "rows": [
+              {
+                "report": 173,
+                "state": "new"
+              }
+            ],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "now": "2026-11-02T09:01:00.000Z"
+      },
+      "result_digest": "067620c384321bff239e7634d3da4b4861d2d96bbc7ad64a59dc821da2e647fe"
+    },
+    {
+      "fn": "step",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-1",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-02T09:00:00.000Z",
+            "subjects": [
+              {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              }
+            ],
+            "rows": [
+              {
+                "report": 173,
+                "state": "new"
+              }
+            ],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "evaluation": {
+          "basis": "73e6523cf7bbcadd6b555e2195f246c849d284cacc3fc7c62b91ab1c69bd44f1",
+          "evaluator": "llm-triage",
+          "proposals": [
+            {
+              "subject": {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              },
+              "status": "open",
+              "cites": [
+                "open-1"
+              ],
+              "actions": [
+                {
+                  "key": "notify",
+                  "arguments": {
+                    "channel": "#security",
+                    "text": "Report 173 needs an owner."
+                  },
+                  "reason": "Nobody owns report 173."
+                }
+              ]
+            }
+          ]
+        },
+        "now": "2026-11-02T09:01:00.000Z"
+      },
+      "state_digest": "c93c48010eba0bd8e2b1d5c16fd568b6b5bce8b6f427b888ecbd3e412dd54222",
+      "result_digest": "a934555c79f01434cf2315aa4b967029af46ffd079f4475090117ba1116a1942"
+    },
+    {
+      "fn": "view",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-2",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-03T09:00:00.000Z",
+            "subjects": [
+              {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              }
+            ],
+            "rows": [
+              {
+                "report": 173,
+                "state": "new"
+              }
+            ],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "now": "2026-11-03T09:01:00.000Z"
+      },
+      "result_digest": "b01f189930af2817b7ed04f4bc580082386afc029f652f54abb34536ca1d4019"
+    },
+    {
+      "fn": "step",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-2",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-03T09:00:00.000Z",
+            "subjects": [
+              {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              }
+            ],
+            "rows": [
+              {
+                "report": 173,
+                "state": "new"
+              }
+            ],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "evaluation": {
+          "basis": "1ab75d2cd3303ee138328157cabb4315ef8344cc0be33b5b59860392bd49501e",
+          "evaluator": "llm-triage",
+          "proposals": [
+            {
+              "subject": {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              },
+              "status": "open",
+              "cites": [
+                "open-2"
+              ],
+              "actions": [
+                {
+                  "key": "notify",
+                  "arguments": {
+                    "channel": "#security",
+                    "text": "Report 173 still needs an owner."
+                  },
+                  "reason": "Nobody owns report 173."
+                }
+              ]
+            }
+          ]
+        },
+        "now": "2026-11-03T09:01:00.000Z"
+      },
+      "state_digest": "e374aee861a236a91080b68491c4b31bada063a2eaa3f59b583b816d7de82f86",
+      "result_digest": "48fef6536311751d563db952a02956c7e8e0f886b813ad6684244dddca1daacb"
+    },
+    {
+      "fn": "view",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-3",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-04T09:00:00.000Z",
+            "subjects": [],
+            "rows": [],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "now": "2026-11-04T09:01:00.000Z"
+      },
+      "result_digest": "021682503f46fb1f49dc4e651726dde57333de9e6904fc4fb777161e908c8aee"
+    },
+    {
+      "fn": "step",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-3",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-04T09:00:00.000Z",
+            "subjects": [],
+            "rows": [],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "evaluation": {
+          "basis": "74ff2f4beaf021c8b96dbe35c6bc0bdd4b3299577af151bd07a08c8798c898cb",
+          "evaluator": "llm-triage",
+          "proposals": [
+            {
+              "subject": {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              },
+              "status": "resolved",
+              "cites": [
+                "open-3"
+              ]
+            }
+          ]
+        },
+        "now": "2026-11-04T09:01:00.000Z"
+      },
+      "state_digest": "0412a663f23bf3e39b31e34b5b33dd2a04d92ad606e81b6c2eb9cf7dda1f9b8c",
+      "result_digest": "a894f867bc143afbaebd39199ef4183401355845ccc8022bd44b62939e2c4389"
+    },
+    {
+      "fn": "view",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-4",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-05T09:00:00.000Z",
+            "subjects": [
+              {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              }
+            ],
+            "rows": [
+              {
+                "report": 173,
+                "state": "new"
+              }
+            ],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "now": "2026-11-05T09:01:00.000Z"
+      },
+      "result_digest": "9f1e356ae4843a1f53c28adfcbe1a940b8e0ed8eea381b57e2217d597ae9b079"
+    },
+    {
+      "fn": "step",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "id": "open-4",
+            "kind": "open_reports",
+            "occurred_at": "2026-11-05T09:00:00.000Z",
+            "subjects": [
+              {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              }
+            ],
+            "rows": [
+              {
+                "report": 173,
+                "state": "new"
+              }
+            ],
+            "complete": true
+          }
+        ],
+        "offered_actions": [
+          {
+            "key": "notify",
+            "params": {
+              "channel": "string",
+              "text": "string"
+            }
+          },
+          {
+            "key": "label",
+            "params": {
+              "name": "string",
+              "urgent": "bool"
+            }
+          }
+        ],
+        "max_requests": 1,
+        "evaluation": {
+          "basis": "1e135005c17323b1eb741341caca7a2563f115ffeebcba6f999ddf98d74da82c",
+          "evaluator": "llm-triage",
+          "proposals": [
+            {
+              "subject": {
+                "type": "report",
+                "keys": {
+                  "report": 173
+                }
+              },
+              "status": "open",
+              "cites": [
+                "open-4"
+              ],
+              "actions": [
+                {
+                  "key": "notify",
+                  "arguments": {
+                    "channel": "#security",
+                    "text": "Report 173 is open again."
+                  },
+                  "reason": "Nobody owns report 173."
+                }
+              ]
+            }
+          ]
+        },
+        "now": "2026-11-05T09:01:00.000Z"
+      },
+      "state_digest": "634d35805540d4b3f9dd16132aa81abe14dc5067229e57c3362fdaf8f1ddd0b0",
+      "result_digest": "aac467b12c7b4944f3d0d3312e1c8a7e35224c4ff5008614cb96896839156307"
+    },
+    {
+      "fn": "command",
+      "args": {
+        "definition": {
+          "id": "security-reports",
+          "version": 1,
+          "identity": {
+            "subject_type": "report",
+            "subject_keys": [
+              "report"
+            ]
+          },
+          "accountable": "team:security",
+          "expectations": "Every report gets an owner within one working day.",
+          "include": [
+            "open_reports",
+            "closed_reports"
+          ],
+          "closing": [
+            {
+              "description": "The report is no longer open.",
+              "rules": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "condition": "absent",
+                  "scope": "all"
+                }
+              ]
+            },
+            {
+              "description": "Somebody confirmed the fix."
+            }
+          ],
+          "success": [
+            {
+              "description": "The report was fixed.",
+              "rules": [
+                {
+                  "kind": "closed_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "resolution": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "command": {
+          "actor": "person:ada",
+          "case_id": "1f14e4fdcb3bf0ac1f105c96e04efb402b48dbea19f36b7b796852dea7e0843c",
+          "status": "dismissed",
+          "reason": "Duplicate of report 170."
+        },
+        "now": "2026-11-05T09:02:00.000Z"
+      },
+      "state_digest": "e11dcc1a04c354831cda26737bf2bb27d2f4f2a43bbb7f51308426f69d4ad0b6",
+      "result_digest": "98513e89439d5181279611505ac196ef3b722854ab2a1b6954c9a8e3df6d3941"
+    }
+  ]
+}

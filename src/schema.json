@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:responsibilities-core:0",
+  "title": "Responsibility Core, spec responsibility-core/0",
+  "description": "Inputs and outputs of view, step, command and assess. Every string is NFC; integers lie within ±(2^53−1); numbers other than integers occur only in observation rows.",
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "int": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+    "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "ordinal": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "key_value": { "anyOf": [{ "$ref": "#/$defs/text" }, { "$ref": "#/$defs/int" }] },
+    "scalar": { "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/int" }, { "type": "boolean" }] },
+    "status": { "enum": ["open", "resolved", "dismissed"] },
+    "outcome": { "enum": ["met", "not_met", "unknown"] },
+    "subject": {
+      "type": "object",
+      "required": ["type", "keys"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/text" },
+        "keys": { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/key_value" } }
+      }
+    },
+
+    "match": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 3,
+      "additionalProperties": { "$ref": "#/$defs/text" }
+    },
+    "rule": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": ["kind", "match"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "$ref": "#/$defs/text" },
+            "match": { "$ref": "#/$defs/match" },
+            "where": { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/scalar" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "match", "condition", "scope"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "$ref": "#/$defs/text" },
+            "match": { "$ref": "#/$defs/match" },
+            "condition": { "const": "absent" },
+            "scope": { "const": "all" }
+          }
+        }
+      ]
+    },
+    "rules": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rule" } },
+    "ruled_criterion": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": ["description", "rules"],
+          "additionalProperties": false,
+          "properties": { "description": { "$ref": "#/$defs/text" }, "rules": { "$ref": "#/$defs/rules" } }
+        },
+        {
+          "type": "object",
+          "required": ["description", "any_of"],
+          "additionalProperties": false,
+          "properties": {
+            "description": { "$ref": "#/$defs/text" },
+            "any_of": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "required": ["rules"],
+                "additionalProperties": false,
+                "properties": { "rules": { "$ref": "#/$defs/rules" } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "closing_criterion": {
+      "anyOf": [
+        { "$ref": "#/$defs/ruled_criterion" },
+        {
+          "type": "object",
+          "required": ["description"],
+          "additionalProperties": false,
+          "properties": { "description": { "$ref": "#/$defs/text" } }
+        }
+      ]
+    },
+
+    "definition": {
+      "type": "object",
+      "required": ["id", "version", "identity", "accountable", "include", "closing", "success"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/text" },
+        "version": { "$ref": "#/$defs/ordinal" },
+        "identity": {
+          "type": "object",
+          "required": ["subject_type", "subject_keys"],
+          "additionalProperties": false,
+          "properties": {
+            "subject_type": { "$ref": "#/$defs/text" },
+            "subject_keys": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } }
+          }
+        },
+        "accountable": { "$ref": "#/$defs/text" },
+        "expectations": { "$ref": "#/$defs/text" },
+        "include": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+        "closing": { "type": "array", "items": { "$ref": "#/$defs/closing_criterion" } },
+        "success": { "type": "array", "items": { "$ref": "#/$defs/ruled_criterion" } }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "required": ["id", "kind", "occurred_at", "subjects", "rows", "complete"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/text" },
+        "kind": { "$ref": "#/$defs/text" },
+        "occurred_at": { "$ref": "#/$defs/time" },
+        "subjects": { "type": "array", "items": { "$ref": "#/$defs/subject" } },
+        "rows": { "type": "array", "items": { "type": "object" } },
+        "complete": { "type": "boolean" }
+      }
+    },
+    "observations": { "type": "array", "items": { "$ref": "#/$defs/observation" } },
+    "offered_action": {
+      "type": "object",
+      "required": ["key", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/text" },
+        "params": { "type": "object", "additionalProperties": { "enum": ["string", "int", "bool"] } }
+      }
+    },
+    "offered_actions": { "type": "array", "items": { "$ref": "#/$defs/offered_action" } },
+    "max_requests": { "$ref": "#/$defs/count" },
+    "proposal": {
+      "type": "object",
+      "required": ["subject", "status", "cites"],
+      "additionalProperties": false,
+      "properties": {
+        "subject": { "$ref": "#/$defs/subject" },
+        "status": { "enum": ["open", "resolved"] },
+        "cites": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+        "title": { "$ref": "#/$defs/text" },
+        "summary": { "$ref": "#/$defs/text" },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "arguments", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "$ref": "#/$defs/text" },
+              "arguments": { "type": "object", "additionalProperties": { "$ref": "#/$defs/scalar" } },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "required": ["basis", "evaluator", "proposals"],
+      "additionalProperties": false,
+      "properties": {
+        "basis": { "$ref": "#/$defs/hash" },
+        "evaluator": { "$ref": "#/$defs/text" },
+        "proposals": { "type": "array", "items": { "$ref": "#/$defs/proposal" } }
+      }
+    },
+    "command": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": ["actor", "case_id", "status"],
+          "additionalProperties": false,
+          "properties": {
+            "actor": { "type": "string", "pattern": "^person:.+" },
+            "case_id": { "$ref": "#/$defs/hash" },
+            "status": { "enum": ["open", "resolved"] },
+            "reason": { "$ref": "#/$defs/text" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["actor", "case_id", "status", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "actor": { "type": "string", "pattern": "^person:.+" },
+            "case_id": { "$ref": "#/$defs/hash" },
+            "status": { "const": "dismissed" },
+            "reason": { "$ref": "#/$defs/text" }
+          }
+        }
+      ]
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "subject", "status", "episode", "seq", "version", "title", "summary",
+        "evidence", "first_observed", "last_observed", "requested"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "subject": { "$ref": "#/$defs/subject" },
+        "status": { "$ref": "#/$defs/status" },
+        "episode": { "$ref": "#/$defs/ordinal" },
+        "seq": { "$ref": "#/$defs/ordinal" },
+        "version": { "$ref": "#/$defs/ordinal" },
+        "title": { "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+        "summary": { "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+        "evidence": { "type": "object", "additionalProperties": { "$ref": "#/$defs/hash" } },
+        "first_observed": { "$ref": "#/$defs/time" },
+        "last_observed": { "$ref": "#/$defs/time" },
+        "requested": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{ "$ref": "#/$defs/text" }, { "$ref": "#/$defs/ordinal" }],
+            "minItems": 2,
+            "items": false
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["spec", "definition_id", "identity_digest", "now", "cases"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": { "const": "responsibility-core/0" },
+        "definition_id": { "$ref": "#/$defs/text" },
+        "identity_digest": { "$ref": "#/$defs/hash" },
+        "now": { "$ref": "#/$defs/time" },
+        "cases": { "type": "object", "additionalProperties": { "$ref": "#/$defs/case" } }
+      }
+    },
+    "state_or_null": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/state" }] },
+
+    "view": {
+      "type": "object",
+      "required": ["spec", "basis", "observations", "open_cases", "closing", "offered_actions", "max_requests"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": { "const": "responsibility-core/0" },
+        "basis": { "$ref": "#/$defs/hash" },
+        "observations": { "$ref": "#/$defs/observations" },
+        "open_cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["case_id", "subject", "status", "episode"],
+            "additionalProperties": false,
+            "properties": {
+              "case_id": { "$ref": "#/$defs/hash" },
+              "subject": { "$ref": "#/$defs/subject" },
+              "status": { "const": "open" },
+              "episode": { "$ref": "#/$defs/ordinal" }
+            }
+          }
+        },
+        "closing": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+        "expectations": { "$ref": "#/$defs/text" },
+        "offered_actions": { "$ref": "#/$defs/offered_actions" },
+        "max_requests": { "$ref": "#/$defs/count" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["result", "criteria"],
+      "additionalProperties": false,
+      "properties": {
+        "result": { "$ref": "#/$defs/outcome" },
+        "criteria": { "type": "array", "items": { "$ref": "#/$defs/criterion_trace" } }
+      }
+    },
+    "criterion_trace": {
+      "type": "object",
+      "required": ["description", "result", "routes"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "$ref": "#/$defs/text" },
+        "result": { "$ref": "#/$defs/outcome" },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["result", "rules"],
+            "additionalProperties": false,
+            "properties": {
+              "result": { "$ref": "#/$defs/outcome" },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["kind", "condition", "observation", "result", "reason"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": { "$ref": "#/$defs/text" },
+                    "condition": { "enum": ["present", "absent"] },
+                    "observation": { "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+                    "result": { "$ref": "#/$defs/outcome" },
+                    "reason": { "$ref": "#/$defs/text" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": ["id", "case_id", "kind", "from", "to", "actor", "added_evidence", "version", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/hash" },
+        "case_id": { "$ref": "#/$defs/hash" },
+        "kind": { "enum": ["opened", "status_changed", "updated"] },
+        "from": { "anyOf": [{ "$ref": "#/$defs/status" }, { "type": "null" }] },
+        "to": { "$ref": "#/$defs/status" },
+        "actor": { "type": "string", "pattern": "^(judge|person):.+" },
+        "reason": { "$ref": "#/$defs/text" },
+        "added_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["obs_id", "digest"],
+            "additionalProperties": false,
+            "properties": { "obs_id": { "$ref": "#/$defs/text" }, "digest": { "$ref": "#/$defs/hash" } }
+          }
+        },
+        "title": { "$ref": "#/$defs/text" },
+        "summary": { "$ref": "#/$defs/text" },
+        "closing_check": { "$ref": "#/$defs/check" },
+        "version": { "$ref": "#/$defs/ordinal" },
+        "at": { "$ref": "#/$defs/time" }
+      }
+    },
+    "rejection": {
+      "type": "object",
+      "required": ["ref", "code", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "object",
+          "required": ["proposal", "part"],
+          "additionalProperties": false,
+          "properties": {
+            "proposal": { "$ref": "#/$defs/hash" },
+            "case_id": { "$ref": "#/$defs/hash" },
+            "part": { "enum": ["proposal", "status", "action"] },
+            "key": { "$ref": "#/$defs/text" }
+          }
+        },
+        "code": {
+          "enum": [
+            "BASIS_MISMATCH", "UNKNOWN_EVIDENCE", "NO_EVIDENCE", "IDENTITY_MISMATCH",
+            "CONFLICTING_PROPOSALS", "STATUS_NOT_ALLOWED", "CLOSING_NOT_MET",
+            "REOPEN_WHILE_CLOSING_MET", "STATUS_UNCHANGED_NO_NEW_EVIDENCE", "ACTION_NOT_OFFERED",
+            "ACTION_ARGUMENTS", "ACTION_NO_REASON", "ACTION_CASE_NOT_OPEN", "ACTION_REPEATED",
+            "ACTION_OVER_LIMIT"
+          ]
+        },
+        "detail": {
+          "type": "object",
+          "required": ["message"],
+          "additionalProperties": false,
+          "properties": {
+            "message": { "$ref": "#/$defs/text" },
+            "expected": { "$ref": "#/$defs/hash" },
+            "received": { "$ref": "#/$defs/hash" },
+            "unknown": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+            "closing_check": { "$ref": "#/$defs/check" },
+            "proposed_title": { "$ref": "#/$defs/text" },
+            "proposed_summary": { "$ref": "#/$defs/text" }
+          }
+        }
+      }
+    },
+    "action_request": {
+      "type": "object",
+      "required": ["id", "case_id", "key", "arguments", "reason", "episode", "transition_id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/hash" },
+        "case_id": { "$ref": "#/$defs/hash" },
+        "key": { "$ref": "#/$defs/text" },
+        "arguments": { "type": "object", "additionalProperties": { "$ref": "#/$defs/scalar" } },
+        "reason": { "$ref": "#/$defs/text" },
+        "episode": { "$ref": "#/$defs/ordinal" },
+        "transition_id": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "step_result": {
+      "type": "object",
+      "required": ["spec", "state", "transitions", "rejections", "action_requests", "state_digest"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": { "const": "responsibility-core/0" },
+        "state": { "$ref": "#/$defs/state_or_null" },
+        "transitions": { "type": "array", "items": { "$ref": "#/$defs/transition" } },
+        "rejections": { "type": "array", "items": { "$ref": "#/$defs/rejection" } },
+        "action_requests": { "type": "array", "items": { "$ref": "#/$defs/action_request" } },
+        "state_digest": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "required": ["spec", "case_id", "result", "criteria"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": { "const": "responsibility-core/0" },
+        "case_id": { "$ref": "#/$defs/hash" },
+        "result": { "$ref": "#/$defs/outcome" },
+        "criteria": { "type": "array", "items": { "$ref": "#/$defs/criterion_trace" } }
+      }
+    }
+  }
+}
