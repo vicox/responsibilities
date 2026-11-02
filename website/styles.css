@@ -177,22 +177,26 @@ var {
   padding-block: clamp(3.5rem, 10vw, 7.5rem) clamp(3rem, 8vw, 6rem);
 }
 
-.eyebrow {
-  margin: 0 0 1rem;
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-/* Wide enough for the home page's H1 to break into two balanced lines. */
+/* The home page's H1 fits on one line from tablet width up. On phones it breaks after
+   "responsibility", and is small enough there to stay on two lines down to 320px. */
 h1 {
   max-width: 22ch;
   margin: 0;
-  font-size: clamp(2.5rem, 4.5vw + 1.25rem, 4.75rem);
+  font-size: clamp(2rem, 4.75vw + 1rem, 4.75rem);
   line-height: 1.04;
   letter-spacing: -0.03em;
+}
+
+/* The line under the H1 that says whose work it is: smaller and quieter than the claim. */
+.subhead {
+  max-width: var(--measure);
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: clamp(1.375rem, 1.5vw + 1rem, 2rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 .lede {
@@ -343,12 +347,12 @@ h3 {
   color: var(--muted);
 }
 
-/* Flow: observe -> judge -> decide -> act, then the loop starts again */
+/* Flow: observe -> judge -> remember */
 
 .flow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2.5rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -370,7 +374,7 @@ h3 {
   content: "";
   position: absolute;
   top: 50%;
-  left: -1.7rem;
+  left: -1.95rem;
   width: 0.9rem;
   height: 0.9rem;
   border-top: 3px solid var(--accent);
@@ -393,19 +397,7 @@ h3 {
   font-size: 0.8rem;
 }
 
-.flow-loop {
-  max-width: var(--measure);
-  margin: 2rem 0 0;
-  color: var(--muted);
-}
-
-.flow-loop span {
-  color: var(--accent);
-  font-weight: 700;
-}
-
-/* Four steps need more room than three: stack them earlier */
-@media (max-width: 64rem) {
+@media (max-width: 56rem) {
   .flow {
     grid-template-columns: 1fr;
     gap: 2.75rem;
