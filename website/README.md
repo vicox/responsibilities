@@ -1,7 +1,7 @@
 # responsibilities.dev
 
-The one-page concept site for responsibilities.dev: *Keep sight of what you’re responsible
-for.* Plain HTML and CSS: no build step, framework, JavaScript or dependency.
+The one-page concept site for responsibilities.dev: *The responsibility layer.* Plain HTML and
+CSS: no build step, framework, JavaScript or dependency.
 
 | File | Purpose |
 | --- | --- |
@@ -30,15 +30,16 @@ the checks: they print the link to use.
     python3 tests/check.py          # prints OK or the failed checks
 
 The checks cover, on both pages, well-formed markup, one `h1` and no skipped heading levels,
-the meta tags, a link to the Impressum, and that every link resolves (anchors on the other
-page included) and nothing external is loaded; plus the home page's key content (the hero word
-for word, with its two calls to action and the title, description and Open Graph tags that
-repeat it; the three examples and their key sentences; the four steps of the delegation story;
-the four steps of *Architecture*, who does each and its key sentence; the four functions and
-the README link in *Built for developers*; the order of the sections), wording that was retired
-and stays gone, a list of
-words the site does not use, the Impressum's required parts, the `CNAME`, and WCAG AA contrast
-of the colour pairs in both colour schemes.
+no eyebrow labels above the headings, the meta tags, a link to the Impressum, a footer that
+repeats the claim, and that every link resolves (anchors on the other page included) and
+nothing external is loaded; plus the home page's key content (the hero word for word: claim,
+subhead and lede in order, and its two calls to action; the title with the short claim, and the
+description and Open Graph tags with the full positioning; the three examples and their key
+sentences; the four steps of the delegation story; the three steps of *Architecture*, each with
+its tag and text; the four functions and the README link in *Built for developers*; the order
+of the sections), wording that was retired and stays gone, a list of words the site does not
+use, the Impressum's required parts, the `CNAME`, and WCAG AA contrast of the colour pairs in
+both colour schemes.
 
 ## Deploy on GitHub Pages
 
