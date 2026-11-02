@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Keep sight of what you’re responsible for · responsibilities.dev</title>
+  <title>Responsibilities — The responsibility layer</title>
   <meta name="description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
   <link rel="canonical" href="https://responsibilities.dev/">
   <meta name="color-scheme" content="light dark">
@@ -12,11 +12,11 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="responsibilities.dev">
   <meta property="og:url" content="https://responsibilities.dev/">
-  <meta property="og:title" content="Keep sight of what you’re responsible for.">
+  <meta property="og:title" content="The responsibility layer for human, agent, and automated work.">
   <meta property="og:description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=31b6c618">
+  <link rel="stylesheet" href="styles.css?v=d3f6cf77">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -40,8 +40,9 @@
   <main id="main" tabindex="-1">
     <section class="hero" aria-labelledby="hero-title">
       <div class="wrap">
-        <h1 id="hero-title">Keep sight of what you’re responsible&nbsp;for.</h1>
-        <p class="lede">Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.</p>
+        <h1 id="hero-title">The responsibility layer.</h1>
+        <p class="subhead">For human, agent, and automated work.</p>
+        <p class="lede">Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through.</p>
         <p class="cta">
           <a class="button" href="https://github.com/vicox/responsibilities#readme">Get started on GitHub</a>
           <a href="#how">See how it works <span aria-hidden="true">→</span></a>
@@ -52,7 +53,6 @@
     <section id="how" class="section" aria-labelledby="how-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">01 · How responsibilities work</p>
           <h2 id="how-title">Responsibilities stay. Matters come and go.</h2>
           <p>A responsibility says what should be true and who answers for it. Within it, each concrete matter that needs attention is a <strong>case</strong>: this customer, waiting for three days; this booking, still unpaid. Attention can mean a review, a decision, accepting something as it is, or an action.</p>
           <p>Cases come from facts. What the systems show, such as the support inbox or the payment system, is read against what is expected. Actions can change the situation; fresh evidence shows what changed. A case can end without the expected outcome being achieved.</p>
@@ -63,7 +63,6 @@
     <section id="examples" class="section" aria-labelledby="examples-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">02 · Examples</p>
           <h2 id="examples-title">Three responsibilities, three kinds of attention.</h2>
         </div>
         <ol class="examples" role="list">
@@ -86,7 +85,6 @@
     <section id="delegation" class="section" aria-labelledby="delegation-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">03 · Delegation</p>
           <h2 id="delegation-title">Delegate the work. Keep the responsibility.</h2>
           <p>A responsibility is about the state, not about who works on it, so it holds when the work changes hands. Take the support responsibility above.</p>
         </div>
@@ -103,40 +101,31 @@
     <section id="architecture" class="section" aria-labelledby="architecture-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">04 · Architecture</p>
           <h2 id="architecture-title" class="stacked"><span>Observe deterministically.</span> <span>Judge probabilistically.</span> <span>Remember persistently.</span></h2>
-          <p>Only the judgment is left to an LLM. Your code, the host, observes, acts and remembers. Between judgment and action, the core decides by fixed rules what follows.</p>
         </div>
         <ol class="flow" role="list">
           <li>
             <h3>Observe</h3>
-            <p>The host reads its systems, such as the support inbox, with the same queries every time. The results are observations.</p>
-            <p class="tag">Host</p>
+            <p>Signals run the same queries against the systems of record, every time.</p>
+            <p class="tag">Signals</p>
           </li>
           <li>
             <h3>Judge</h3>
-            <p>An LLM reads the observations against the expectations and proposes cases, evidence and actions. It changes nothing itself.</p>
-            <p class="tag">LLM</p>
+            <p>A model reads the facts against the expectations and proposes cases with their evidence. Code checks what can be checked exactly.</p>
+            <p class="tag">AI + rules</p>
           </li>
           <li>
-            <h3>Decide</h3>
-            <p>The core’s <code>step</code> checks each proposal against fixed rules and returns the transitions, the new state and the action requests. It executes nothing.</p>
-            <p class="tag">Core</p>
-          </li>
-          <li>
-            <h3>Act</h3>
-            <p>The host stores the result, then executes the stored requests. Only new observations confirm what changed.</p>
-            <p class="tag">Host</p>
+            <h3>Remember</h3>
+            <p>Cases keep their history across runs, so each judgment starts from what is already known.</p>
+            <p class="tag">Persistent cases</p>
           </li>
         </ol>
-        <p class="flow-loop"><span aria-hidden="true">↻</span> Then the loop starts again. The next call starts from the stored state, the cases with their evidence; the transitions remain as their history. The core keeps nothing between calls.</p>
       </div>
     </section>
 
     <section id="developers" class="section" aria-labelledby="developers-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">05 · Built for developers</p>
           <h2 id="developers-title">Four functions. One responsibility lifecycle.</h2>
           <p>Responsibilities Core is the decision step in that loop, as four pure functions over plain JSON: deterministic TypeScript with no runtime dependencies. The same inputs give byte-identical outputs. It loads, stores, schedules, calls models and executes nothing, and has no clock: your code supplies the time.</p>
         </div>
@@ -165,7 +154,6 @@
     <section id="accountability" class="section" aria-labelledby="accountability-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">06 · Accountability</p>
           <h2 id="accountability-title">Delegating the work does not automatically transfer accountability.</h2>
           <p>People define what should be true and what agents and automations may do on their own. Accountability can change hands through an explicit handover. Every case can be checked against the facts behind it.</p>
           <p>It follows states in the world and runs alongside the work. Its view is only as current and complete as its observations. Steps that can’t be undone still need safeguards before they happen.</p>
@@ -176,7 +164,7 @@
 
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <p><span class="brand-text">responsibilities.dev</span> · Keep sight of what you’re responsible for.</p>
+      <p><span class="brand-text">responsibilities.dev</span> · The responsibility layer.</p>
       <a href="impressum.html">Impressum</a>
     </div>
   </footer>

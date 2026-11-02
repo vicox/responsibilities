@@ -118,6 +118,9 @@ for name, canonical in PAGES.items():
     for prev, cur in zip(page.headings, page.headings[1:]):
         check(cur <= prev + 1, f"{name}: heading level jumps from h{prev} to h{cur}")
 
+    # No eyebrows: headings stand without a small label above them
+    check("eyebrow" not in html, f"{name}: no eyebrow labels above headings")
+
     # Every page links to the Impressum
     check(any(url == "impressum.html" for _, _, url in page.links), f"{name}: no link to impressum.html")
 
@@ -148,30 +151,37 @@ html, page = pages["index.html"]
 for key in ("og:type", "og:site_name", "og:url", "og:title", "og:description", "twitter:card"):
     check(key in page.meta, f"index.html: missing meta {key}")
 check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
-# The hero, word for word, and the head tags and footers that repeat it
-H1 = "Keep sight of what you’re responsible for."
-LEDE_LEAD = "Customers need answers. Bookings need payment. Important changes need follow-through."
-LEDE_CORE = ("Define what should happen, recognise what needs attention, and follow each case through — "
-             "whether the work is done by people, agents or automations.")
-check(f'<h1 id="hero-title">{H1.replace(" for.", "&nbsp;for.")}</h1>' in html, f"index.html: H1 must be: {H1}")
-check(f'<p class="lede">{LEDE_LEAD} {LEDE_CORE}</p>' in html, "index.html: the hero lede is not verbatim")
+# The hero, word for word and in order: the short claim, the line under it and the lede. The
+# title and footers carry the short claim; the description and Open Graph tags stand alone in a
+# search result or a shared link, so they carry the full positioning.
+H1 = "The responsibility layer."
+SUBHEAD = "For human, agent, and automated work."
+LEDE = ("Customers need answers. Bookings need payment. Important changes need follow-through. "
+        "Define what should happen, recognise what needs attention, and follow each case through.")
+TITLE = "Responsibilities — The responsibility layer"
+OG_TITLE = "The responsibility layer for human, agent, and automated work."
+DESCRIPTION = ("Define what should happen, recognise what needs attention, and follow each case through — "
+               "whether the work is done by people, agents or automations.")
+hero = re.search(r'<section class="hero"[^>]*>(.*?)</section>', html, re.S)
+hero_lines = re.findall(r"<(h1|p) ([^>]*)>(.*?)</\1>", hero.group(1), re.S)[:3] if hero else []
+check(hero_lines == [("h1", 'id="hero-title"', H1), ("p", 'class="subhead"', SUBHEAD), ("p", 'class="lede"', LEDE)],
+      f"index.html: the hero must open with the H1 '{H1}', then the subhead '{SUBHEAD}', then the lede, word for word")
 # Two CTAs, in order: the README on GitHub, then the explanation on this page
 cta = re.search(r'<p class="cta">(.*?)</p>', html, re.S)
 check(cta and re.findall(r"<a [^>]*>.*?</a>", cta.group(1), re.S) == [
     f'<a class="button" href="{README}">Get started on GitHub</a>',
     '<a href="#how">See how it works <span aria-hidden="true">→</span></a>',
 ], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See how it works →' (#how)")
-check(page.title == f"{H1[:-1]} · responsibilities.dev", f"index.html: title must repeat the H1: {page.title!r}")
-check(page.meta.get("og:title") == [H1], "index.html: og:title must be the H1")
-check(page.meta.get("description") == [LEDE_CORE], "index.html: meta description must be the lede's second part")
-check(page.meta.get("og:description") == [LEDE_CORE], "index.html: og:description must be the lede's second part")
+check(page.title == TITLE, f"index.html: title must be {TITLE!r}: {page.title!r}")
+check(page.meta.get("og:title") == [OG_TITLE], f"index.html: og:title must be the full positioning: {OG_TITLE}")
+check(page.meta.get("description") == [DESCRIPTION], "index.html: meta description is not verbatim")
+check(page.meta.get("og:description") == [DESCRIPTION], "index.html: og:description must match the meta description")
 for name in PAGES:
     check(f'<span class="brand-text">responsibilities.dev</span> · {H1}</p>' in pages[name][0],
           f"{name}: the footer must repeat the H1")
 
 # Required content, word for word
 for phrase in (
-    '<p class="eyebrow">01 · How responsibilities work</p>',
     "Responsibilities stay. Matters come and go.",
     "A responsibility says what should be true and who answers for it.",
     "each concrete matter that needs attention is a <strong>case</strong>",
@@ -183,8 +193,6 @@ for phrase in (
     "<span>Observe deterministically.</span>",
     "<span>Judge probabilistically.</span>",
     "<span>Remember persistently.</span>",
-    "The core keeps nothing between calls.",
-    '<p class="eyebrow">05 · Built for developers</p>',
     "Four functions. One responsibility lifecycle.",
     "pure functions over plain JSON: deterministic TypeScript with no runtime dependencies.",
     "Optional: a person decides. A human override",
@@ -219,21 +227,19 @@ check(story and story.group(1).count("<li>") == 4, "index.html: the delegation s
 check(story and "The support system records your reply, and the case closes." in story.group(1),
       "index.html: the story must close its case on the recorded reply")
 
-# Architecture: the core's loop in four steps, each with who does it and the sentence that
-# keeps it honest: the LLM only proposes, the core only decides, the host stores before it acts
-# and effects count only once observed
+# Architecture: observe, judge, remember, each with its tag and its text
 FLOW = [
-    ("Observe", "Host", "The results are observations."),
-    ("Judge", "LLM", "It changes nothing itself."),
-    ("Decide", "Core", "It executes nothing."),
-    ("Act", "Host", "The host stores the result, then executes the stored requests. Only new observations confirm what changed."),
+    ("Observe", "Signals", "Signals run the same queries against the systems of record, every time."),
+    ("Judge", "AI + rules", "A model reads the facts against the expectations and proposes cases with their evidence. "
+                            "Code checks what can be checked exactly."),
+    ("Remember", "Persistent cases", "Cases keep their history across runs, so each judgment starts from what is already known."),
 ]
 flow = re.search(r'<ol class="flow"[^>]*>(.*?)</ol>', html, re.S)
 steps = re.findall(r"<li>(.*?)</li>", flow.group(1), re.S) if flow else []
 check(len(steps) == len(FLOW), f"index.html: the flow has {len(steps)} steps, expected {len(FLOW)}")
 for item, (title, tag, sentence) in zip(steps, FLOW):
-    check(f"<h3>{title}</h3>" in item and f'<p class="tag">{tag}</p>' in item and sentence in item,
-          f"index.html: flow step {title} must be done by {tag} and say: {sentence}")
+    check(f"<h3>{title}</h3>" in item and f'<p class="tag">{tag}</p>' in item and f"<p>{sentence}</p>" in item,
+          f"index.html: flow step {title} must be tagged {tag} and say: {sentence}")
 
 # Built for developers: the four functions, in order, and the README
 functions = re.search(r'<dl class="functions">(.*?)</dl>', html, re.S)
@@ -253,6 +259,7 @@ for phrase in (
     "Five things that should never be forgotten", "Tasks end. Responsibilities don’t.",
     "Agents are responsible.", "Alina", "It takes both", "come back to your attention",
     "Who answers for it doesn’t", "not surveillance", "changes the world", "stops falling",
+    "Keep sight of what you",
 ):
     check(phrase not in html, f"index.html: superseded text: {phrase}")
 
@@ -278,6 +285,7 @@ for phrase in (
 # colour schemes
 check(not re.search(r"https?://|@import", css), "styles.css must not load anything external")
 check(css.count("{") == css.count("}"), "unbalanced braces in styles.css")
+check("eyebrow" not in css, "styles.css: no eyebrow styles")
 defined = set(re.findall(r"(--[\w-]+)\s*:", css))
 for prop in set(re.findall(r"var\((--[\w-]+)\)", css)):
     check(prop in defined, f"undefined custom property {prop}")
