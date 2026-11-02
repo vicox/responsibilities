@@ -1,14 +1,16 @@
 # Responsibilities
 
-The responsibility layer.
+### The responsibility layer.
 
-For human, agent, and automated work.
+*For human, agent, and automated work.*
 
-Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.
+Customers need answers. Bookings need payment. Important changes need follow-through. Responsibilities helps define what should happen, recognise when action is needed, and follow each case through to its outcome.
 
 ## Why Responsibilities?
 
-Noticing that something needs attention is the easy part. The hard part is following it through: the alert that fired once and was forgotten, the ticket closed while the customer still waits, the agent that stopped working without anyone noticing. A Responsibility is the shared frame around that work: it names who answers for it and tracks the outcome. Each matter that needs attention becomes a case. The case stays open until the facts show it is over, or a person decides otherwise. Whether the outcome was good is a separate question, because a case can end without the expected outcome.
+Noticing a problem is one thing. Making sure something happens about it — and knowing how it turned out — is another.
+
+An alert is forgotten. A ticket is closed while the customer is still waiting. An agent stops working without anyone noticing. Responsibilities connects what should happen with what actually happens. It keeps each case in view, from the first sign that action is needed to its eventual outcome, whether the work is done by a person, an agent, or an automation.
 
 ## What Responsibilities Core does
 
