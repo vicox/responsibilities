@@ -34,7 +34,32 @@ People can intervene through `command`, and `assess` checks whether a case achie
 - **Case** – one subject under the Responsibility, here one inquiry: `open`, `resolved` or `dismissed`, with linked evidence and an `episode` that counts status changes.
 - **Action request** – an action the host offered and the LLM asked for, checked by the core. The host executes it; its effect returns only as a new observation.
 
+## API at a glance
+
+- `view` – prepares the LLM's context.
+- `step` – validates the LLM's proposals and returns the new state and action requests.
+- `command` – lets a person set a case's status directly.
+- `assess` – checks whether a case met its success criteria.
+
+**`view(definition, state, observations, offered_actions, max_requests, now)` → `View`**
+*What is going on?* Prepares the LLM's context: the included observations, the open cases, the closing descriptions, `expectations`, the offered actions, `max_requests`, and a `basis` that binds all of these inputs.
+
+**`step(definition, state, observations, offered_actions, max_requests, evaluation, now)` → `{spec, state, transitions, rejections, action_requests, state_digest}`**
+*Does the LLM's proposal hold?* `evaluation` is `{basis, evaluator, proposals}`, with `basis` copied from the view. Each proposal is taken, taken in part, or rejected with a code; from what is taken follow the new state and the action requests.
+
+**`command(definition, state, {actor: "person:<id>", case_id, status, reason?}, now)` → same as `step`**
+*Optional: a person decides.* Sets `open`, `resolved` or `dismissed` on an existing case without judgment gates; `reason` is required for `dismissed`. The loop does not need it; it is how a person steps in.
+
+**`assess(definition, state, case_id, observations, now)` → `{spec, case_id, result: "met" | "not_met" | "unknown", criteria}`**
+*Was it a success?* Reads the success criteria, with a trace per rule; no success criteria is `unknown`. Writes nothing.
+
+`resolved` means the case is over. When the LLM proposes it, `step` accepts it only if the closing criteria with rules are met (without rules, it needs new evidence); a person's `command` sets it without that check. Whether the outcome was good is the separate question `assess` answers.
+
+All four are synchronous. `state` is `null` before the first step. A contract violation throws `InputError` and returns nothing; a refused proposal is data, a `rejection`. `src/schema.json` (exported as `schema` and as `responsibilities-core/schema.json`) defines every input and output. Also exported: `digest` (`H`), `canonical` (RFC 8785), `SPEC`, `InputError`, the types.
+
 ## See it in action
+
+A customer inquiry has been waiting for an answer. Responsibilities recognises that it needs attention, requests a reminder, and tracks what happens next. When the inquiry is eventually answered, it checks whether the 24-hour target was met.
 
 The Responsibility: every customer inquiry gets a first answer within 24 hours. Both blocks run as one test, and `fixtures/example.json` is their recording.
 
@@ -119,24 +144,6 @@ const a = assess(definition2, c.state, caseId, [answered], later);
 ```
 
 The case is over, and its success criterion was not met. The core keeps both facts apart.
-
-## The four functions
-
-**`view(definition, state, observations, offered_actions, max_requests, now)` → `View`**
-*What is going on?* Prepares the LLM's context: the included observations, the open cases, the closing descriptions, `expectations`, the offered actions, `max_requests`, and a `basis` that binds all of these inputs.
-
-**`step(definition, state, observations, offered_actions, max_requests, evaluation, now)` → `{spec, state, transitions, rejections, action_requests, state_digest}`**
-*Does the LLM's proposal hold?* `evaluation` is `{basis, evaluator, proposals}`, with `basis` copied from the view. Each proposal is taken, taken in part, or rejected with a code; from what is taken follow the new state and the action requests.
-
-**`command(definition, state, {actor: "person:<id>", case_id, status, reason?}, now)` → same as `step`**
-*Optional: a person decides.* Sets `open`, `resolved` or `dismissed` on an existing case without judgment gates; `reason` is required for `dismissed`. The loop does not need it; it is how a person steps in.
-
-**`assess(definition, state, case_id, observations, now)` → `{spec, case_id, result: "met" | "not_met" | "unknown", criteria}`**
-*Was it a success?* Reads the success criteria, with a trace per rule; no success criteria is `unknown`. Writes nothing.
-
-**Closed is not success.** `resolved` means the case is over. When the LLM proposes it, `step` accepts it only if the closing criteria with rules are met (without rules, it needs new evidence); a person's `command` sets it without that check. Whether the outcome was good is the separate question `assess` answers.
-
-All four are synchronous. `state` is `null` before the first step. A contract violation throws `InputError` and returns nothing; a refused proposal is data, a `rejection`. `src/schema.json` (exported as `schema` and as `responsibilities-core/schema.json`) defines every input and output. Also exported: `digest` (`H`), `canonical` (RFC 8785), `SPEC`, `InputError`, the types.
 
 ## Integration and reference
 
