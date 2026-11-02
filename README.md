@@ -12,18 +12,22 @@ Noticing a problem is one thing. Making sure something happens about it — and 
 
 An alert is forgotten. A ticket is closed while the customer is still waiting. An agent stops working without anyone noticing. Responsibilities connects what should happen with what actually happens. It keeps each case in view, from the first sign that action is needed to its eventual outcome, whether the work is done by a person, an agent, or an automation.
 
-## What Responsibilities Core does
+## How Responsibilities works
 
-The loop is **Observe → Judge → Decide → Act**. The host, which is your code, observes, acts and persists; an LLM judges; the deterministic core validates every proposal and decides what follows. This library, `responsibilities-core`, is that decision step, as four pure functions over plain JSON:
+Responsibilities connects what should happen with what actually happens through four steps: **Observe → Judge → Decide → Act**.
 
-1. **Observe** (host). The host loads observations (facts from its systems) and calls `view` to prepare the LLM's context: the included observations, the open cases, the expectations and the offered actions.
-2. **Judge** (LLM). The LLM reads the view and proposes: open or resolve a case, cite evidence, request actions. It changes nothing itself and never dismisses.
-3. **Decide** (core). `step` checks every proposal against fixed rules and returns the new state (the cases and their evidence), the transitions and the action requests. It executes nothing.
-4. **Act** (host). The host stores the result, then executes the stored requests. Their effects return only as new observations, and the loop starts again from the stored state.
+1. **Observe** — Your application collects facts and calls `view` to give the LLM the relevant context: expectations, observations, and open cases.
+2. **Judge** — The LLM interprets that context and proposes which cases to open or resolve and which actions to request.
+3. **Decide** — Responsibilities uses `step` to validate those proposals, update case state, and return action requests.
+4. **Act** — Your application executes the requested actions. Their results become new observations, and the cycle continues.
 
-A person can step in at any point with `command`, and `assess` reports whether a case met its success criteria. The core loads, stores, schedules, calls models and executes nothing, and has no clock: the host supplies `now`. The same inputs give byte-identical outputs.
+The responsibilities are deliberately separated. **Your application observes and acts. The LLM judges. Responsibilities decides.**
 
-The words used below:
+Responsibilities never calls an LLM, executes an action, or stores data. Its decisions are deterministic: the same inputs produce the same outputs.
+
+People can intervene through `command`, and `assess` checks whether a case achieved its expected outcome.
+
+### Core concepts
 
 - **Definition** – the Responsibility: `identity` (subject type and key names), `accountable` (who answers for it), `expectations` (words for the LLM), `include` (observation kinds the LLM sees and may cite), `closing` (when a case is over), `success` (what a good outcome is).
 - **Observation** – an immutable fact: `id`, `kind`, `occurred_at`, `rows`, and `complete` (the rows are everything the source had).
