@@ -1,21 +1,23 @@
-# responsibilities-core
+# Responsibilities
 
-Keep sight of what you're responsible for.
+The responsibility layer.
+
+For human, agent, and automated work.
+
+Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.
 
 ## Why Responsibilities?
 
-Customers need answers. Bookings need payment. Important changes need follow-through.
-
-Noticing that something needs attention is the easy part. The hard part is following it through: the alert that fired once and was forgotten, the ticket closed while the customer still waits, the agent that stopped working without anyone noticing. A Responsibility says what should be true and who answers for it, whoever does the work: people, agents or automations. Each matter that needs attention becomes a case. The case stays open until the facts show it is over, or a person decides otherwise. Whether the outcome was good is a separate question, because a case can end without the expected outcome.
+Noticing that something needs attention is the easy part. The hard part is following it through: the alert that fired once and was forgotten, the ticket closed while the customer still waits, the agent that stopped working without anyone noticing. A Responsibility is the shared frame around that work: it names who answers for it and tracks the outcome. Each matter that needs attention becomes a case. The case stays open until the facts show it is over, or a person decides otherwise. Whether the outcome was good is a separate question, because a case can end without the expected outcome.
 
 ## What Responsibilities Core does
 
-This library is the decision step in that loop, as four pure functions over plain JSON:
+The loop is **Observe → Judge → Decide → Act**. The host, which is your code, observes, acts and persists; an LLM judges; the deterministic core validates every proposal and decides what follows. This library, `responsibilities-core`, is that decision step, as four pure functions over plain JSON:
 
-1. **Observe.** The host, which is your code, loads observations (facts from its systems) and calls `view` to prepare the LLM's context.
-2. **Judge.** An LLM reads the view and proposes: open or resolve a case, cite evidence, request actions. It changes nothing itself and never dismisses.
-3. **Decide.** `step` checks every proposal against fixed rules and returns the new state (the cases and their evidence), the transitions and the action requests. It executes nothing.
-4. **Act.** The host stores the result and executes the requests. Their effects return only as new observations, and the loop starts again.
+1. **Observe** (host). The host loads observations (facts from its systems) and calls `view` to prepare the LLM's context: the included observations, the open cases, the expectations and the offered actions.
+2. **Judge** (LLM). The LLM reads the view and proposes: open or resolve a case, cite evidence, request actions. It changes nothing itself and never dismisses.
+3. **Decide** (core). `step` checks every proposal against fixed rules and returns the new state (the cases and their evidence), the transitions and the action requests. It executes nothing.
+4. **Act** (host). The host stores the result, then executes the stored requests. Their effects return only as new observations, and the loop starts again from the stored state.
 
 A person can step in at any point with `command`, and `assess` reports whether a case met its success criteria. The core loads, stores, schedules, calls models and executes nothing, and has no clock: the host supplies `now`. The same inputs give byte-identical outputs.
 
