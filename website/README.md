@@ -13,7 +13,7 @@ CSS: no build step, framework, JavaScript or dependency.
 | `.nojekyll` | Tells GitHub Pages to publish the files as they are, without Jekyll |
 | `tests/check.py` | Static checks (Python standard library) |
 
-Assets are linked with relative URLs (`styles.css`, `favicon.svg`, `#examples`,
+Assets are linked with relative URLs (`styles.css`, `favicon.svg`, `#in-practice`,
 `impressum.html`), so the pages work the same at `https://responsibilities.dev/`, under a
 project path such as `https://<user>.github.io/responsibilities.dev/` and on a local server.
 The only absolute URLs are each page's canonical link, the home page's `og:url`, its links to
@@ -31,14 +31,16 @@ the checks: they print the link to use.
 
 The checks cover, on both pages, well-formed markup, one `h1` and no skipped heading levels,
 an eyebrow label above each of the six section headings on the home page (none in the hero or
-on the Impressum), the meta tags, a link to the Impressum, a footer that
-repeats the claim, and that every link resolves (anchors on the other page included) and
-nothing external is loaded; plus the home page's key content (the hero word for word: claim,
-subhead and lede in order, and its two calls to action; the title with the short claim, and the
-description and Open Graph tags with the full positioning; the three examples and their key
-sentences; the four steps of the delegation story; the three steps of *Architecture*, each with
-its tag and text; the four functions and the README link in *Built for developers*; the order
-of the sections), wording that was retired and stays gone, a list of words the site does not
+on the Impressum), a navigation that lists those labels in the same order, each linking the
+section whose id is its label in lower case with hyphens, the meta tags, a link to the
+Impressum, a footer that repeats the claim, and that every link resolves (anchors on the other
+page included) and nothing external is loaded; plus the home page's key content (the hero word
+for word: claim, subhead and lede in order, and its two calls to action; the title with the
+short claim, and the description and Open Graph tags with the full positioning; the three
+examples and their key sentences; the four steps of the delegation story; the three steps of
+*How it works*, each with its tag and text; the four functions and the README link in *For
+developers*; the order of the sections; the closing takeaway and its link to the README), wording
+that was retired and stays gone, a list of words the site does not
 use, the Impressum's required parts, the `CNAME`, and WCAG AA contrast of the colour pairs in
 both colour schemes.
 

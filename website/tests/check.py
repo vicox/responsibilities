@@ -152,12 +152,14 @@ html, page = pages["index.html"]
 for key in ("og:type", "og:site_name", "og:url", "og:title", "og:description", "twitter:card"):
     check(key in page.meta, f"index.html: missing meta {key}")
 check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
-# The hero, word for word and in order: the short claim, the line under it and the lede. The
+# The hero, word for word and in order: the short claim, the line under it and the lede, which
+# opens with the problem: the work succeeds or stops while the outcome is still missing. The
 # title and footers carry the short claim; the description and Open Graph tags stand alone in a
 # search result or a shared link, so they carry the full positioning.
 H1 = "The responsibility layer."
 SUBHEAD = "For human, agent, and automated work."
-LEDE = ("Customers need answers. Bookings need payment. Important changes need follow-through. "
+LEDE = ("An automation sends the invoice and reports success. The booking is still unpaid. "
+        "An agent stops while a customer is still waiting. "
         "Define what should happen, recognise what needs attention, and follow each case through.")
 TITLE = "Responsibilities — The responsibility layer"
 OG_TITLE = "The responsibility layer for human, agent, and automated work."
@@ -171,8 +173,8 @@ check(hero_lines == [("h1", 'id="hero-title"', H1), ("p", 'class="subhead"', SUB
 cta = re.search(r'<p class="cta">(.*?)</p>', html, re.S)
 check(cta and re.findall(r"<a [^>]*>.*?</a>", cta.group(1), re.S) == [
     f'<a class="button" href="{README}">Get started on GitHub</a>',
-    '<a href="#how">See how it works <span aria-hidden="true">→</span></a>',
-], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See how it works →' (#how)")
+    '<a href="#how-it-works">See how it works <span aria-hidden="true">→</span></a>',
+], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See how it works →' (#how-it-works)")
 check(page.title == TITLE, f"index.html: title must be {TITLE!r}: {page.title!r}")
 check(page.meta.get("og:title") == [OG_TITLE], f"index.html: og:title must be the full positioning: {OG_TITLE}")
 check(page.meta.get("description") == [DESCRIPTION], "index.html: meta description is not verbatim")
@@ -184,13 +186,20 @@ for name in PAGES:
 # Required content, word for word
 for phrase in (
     "Responsibilities stay. Matters come and go.",
+    "Work can succeed and still miss what it was for.",
     "A responsibility says what should be true and who answers for it.",
     "each concrete matter that needs attention is a <strong>case</strong>",
     "Actions can change the situation; fresh evidence shows what changed.",
     "A case can end without the expected outcome being achieved.",
-    "Three responsibilities, three kinds of attention.",
+    "Workflows and automations run steps. Monitoring raises alerts when a metric crosses a threshold. "
+    "Agent frameworks coordinate what agents do.",
+    "The responsibility layer holds what should be true, checks it against the facts, and follows each case through. "
+    "It works alongside them, not instead of them.",
     "Delegate the work. Keep the responsibility.",
+    "Take a support responsibility: customers waiting on us get an answer within two working days.",
     "That gives you a basis for handing over more, step by step, and improving the agent as you go.",
+    "Three responsibilities, three kinds of attention.",
+    "Not every case starts with a failure.",
     "<span>Observe deterministically.</span>",
     "<span>Judge probabilistically.</span>",
     "<span>Remember persistently.</span>",
@@ -201,6 +210,8 @@ for phrase in (
     "Delegating the work does not automatically transfer accountability.",
     "Accountability can change hands through an explicit handover.",
     "Its view is only as current and complete as its observations.",
+    "Steps that can’t be undone still need safeguards before they happen.",
+    "<strong>Hand over more of the work. Keep each case in view, through to its outcome.</strong>",
 ):
     check(phrase in html, f"index.html: missing text: {phrase}")
 
@@ -242,35 +253,47 @@ for item, (title, tag, sentence) in zip(steps, FLOW):
     check(f"<h3>{title}</h3>" in item and f'<p class="tag">{tag}</p>' in item and f"<p>{sentence}</p>" in item,
           f"index.html: flow step {title} must be tagged {tag} and say: {sentence}")
 
-# Built for developers: the four functions, in order, and the README
+# For developers: the four functions, in order, and the README
 functions = re.search(r'<dl class="functions">(.*?)</dl>', html, re.S)
 check(functions and re.findall(r"<dt><code>(\w+)</code></dt>", functions.group(1)) == ["view", "step", "command", "assess"],
       "index.html: the functions must be view, step, command, assess")
-developers = re.search(r'<section id="developers"(.*?)</section>', html, re.S)
-check(developers and f'href="{README}"' in developers.group(1), "index.html: Built for developers must link the README")
+developers = re.search(r'<section id="for-developers"(.*?)</section>', html, re.S)
+check(developers and f'href="{README}"' in developers.group(1), "index.html: For developers must link the README")
 
-order = [html.find(f'id="{section}"') for section in ("how", "examples", "delegation", "architecture", "developers", "accountability")]
-check(-1 not in order and order == sorted(order),
-      "index.html: sections must be ordered how, examples, delegation, architecture, developers, accountability")
-
-# Eyebrows: each section head opens with its label, directly before the h2; none in the hero.
-# The labels are written in sentence case; the stylesheet sets them in capitals.
-EYEBROWS = {
-    "how": "The core idea",
-    "examples": "In practice",
-    "delegation": "Delegation",
-    "architecture": "How it works",
-    "developers": "For developers",
-    "accountability": "Accountability",
-}
-for section, label in EYEBROWS.items():
-    body = re.search(rf'<section id="{section}"[^>]*>(.*?)</section>', html, re.S)
+# The story, in order: the idea, the delegation story, the examples, how it works, the developers'
+# view, and accountability, which closes the page with its takeaway and the README on GitHub.
+# Each section is named once: the eyebrow labels it, its id is that label in lower case with
+# hyphens, its h2 is <id>-title and labels the section, and the navigation on both pages lists
+# the same labels in the same order. The labels are written in sentence case; the stylesheet
+# sets them in capitals.
+EYEBROWS = ["The core idea", "Delegation", "In practice", "How it works", "For developers", "Accountability"]
+SECTIONS = [label.lower().replace(" ", "-") for label in EYEBROWS]
+order = [html.find(f'<section id="{section}"') for section in SECTIONS]
+check(-1 not in order and order == sorted(order), f"index.html: sections must be ordered {', '.join(SECTIONS)}")
+check(len(re.findall(r'<section id="', html)) == len(SECTIONS), f"index.html: expected exactly the sections {SECTIONS}")
+for section, label in zip(SECTIONS, EYEBROWS):
+    body = re.search(rf'<section id="{section}" class="section" aria-labelledby="{section}-title">(.*?)</section>', html, re.S)
     head = rf'<div class="section-head">\s*<p class="eyebrow">{re.escape(label)}</p>\s*<h2 id="{section}-title"'
     check(body and re.search(head, body.group(1)),
-          f'index.html: #{section} must open its section head with <p class="eyebrow">{label}</p>, directly before its h2')
+          f'index.html: #{section} must be labelled by {section}-title and open its section head with '
+          f'<p class="eyebrow">{label}</p>, directly before its h2')
 eyebrows = html.count('class="eyebrow"')
 check(eyebrows == len(EYEBROWS), f"index.html: {eyebrows} eyebrows, expected {len(EYEBROWS)}, one per section")
 check(hero and "eyebrow" not in hero.group(1), "index.html: no eyebrow in the hero")
+for name, prefix in (("index.html", "#"), ("impressum.html", "./#")):
+    nav = re.search(r"<nav [^>]*>(.*?)</nav>", pages[name][0], re.S)
+    entries = re.findall(r'<li><a href="([^"]*)">([^<]*)</a></li>', nav.group(1)) if nav else []
+    check(entries == [(prefix + section, label) for section, label in zip(SECTIONS, EYEBROWS)],
+          f"{name}: the navigation must list the eyebrows in order, each linking its section: {entries}")
+
+# The close: the takeaway ends the last section head, followed by the README on GitHub
+accountability = re.search(r'<section id="accountability"[^>]*>(.*?)</section>', html, re.S)
+check(accountability and re.search(
+    r"<p><strong>Hand over more of the work\. Keep each case in view, through to its outcome\.</strong> "
+    r"Start with one responsibility\.</p>\s*</div>\s*"
+    + re.escape(f'<p class="cta"><a class="button" href="{README}">Get started on GitHub</a></p>')
+    + r"\s*</div>\s*$", accountability.group(1)),
+    "index.html: Accountability must end with the takeaway, then 'Get started on GitHub' (the README)")
 
 # Retired wording stays gone: earlier examples and headings, and phrasings that claimed too much
 for phrase in (
@@ -280,6 +303,7 @@ for phrase in (
     "Agents are responsible.", "Alina", "It takes both", "come back to your attention",
     "Who answers for it doesn’t", "not surveillance", "changes the world", "stops falling",
     "Keep sight of what you",
+    "the support responsibility above",
 ):
     check(phrase not in html, f"index.html: superseded text: {phrase}")
 
