@@ -152,15 +152,16 @@ html, page = pages["index.html"]
 for key in ("og:type", "og:site_name", "og:url", "og:title", "og:description", "twitter:card"):
     check(key in page.meta, f"index.html: missing meta {key}")
 check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
-# The hero, word for word and in order: the short claim, the line under it and the lede, which
-# opens with the problem: the work succeeds or stops while the outcome is still missing. The
+# The hero, word for word and in order: the short claim, the line under it and the lede: two
+# short contradictions (the work succeeds or stops while the outcome is still missing), then the
+# benefit, and nothing more; the explanation follows in the sections. The
 # title and footers carry the short claim; the description and Open Graph tags stand alone in a
 # search result or a shared link, so they carry the full positioning.
 H1 = "The responsibility layer."
 SUBHEAD = "For human, agent, and automated work."
-LEDE = ("An automation sends the invoice and reports success. The booking is still unpaid. "
-        "An agent stops while a customer is still waiting. Delegate the work without losing sight of the outcome: "
-        "define what should happen, recognise what needs attention, and follow each case through.")
+LEDE = ("An invoicing automation reports success. The booking is still unpaid. "
+        "An agent stops. The customer is still waiting. "
+        "Delegate the work without losing sight of the outcome.")
 TITLE = "Responsibilities — The responsibility layer"
 OG_TITLE = "The responsibility layer for human, agent, and automated work."
 DESCRIPTION = ("Define what should happen, recognise what needs attention, and follow each case through — "
