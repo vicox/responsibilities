@@ -159,8 +159,8 @@ check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
 H1 = "The responsibility layer."
 SUBHEAD = "For human, agent, and automated work."
 LEDE = ("An automation sends the invoice and reports success. The booking is still unpaid. "
-        "An agent stops while a customer is still waiting. "
-        "Define what should happen, recognise what needs attention, and follow each case through.")
+        "An agent stops while a customer is still waiting. Delegate the work without losing sight of the outcome: "
+        "define what should happen, recognise what needs attention, and follow each case through.")
 TITLE = "Responsibilities — The responsibility layer"
 OG_TITLE = "The responsibility layer for human, agent, and automated work."
 DESCRIPTION = ("Define what should happen, recognise what needs attention, and follow each case through — "
@@ -215,22 +215,30 @@ for phrase in (
 ):
     check(phrase in html, f"index.html: missing text: {phrase}")
 
-# The three examples, in order: each title, and the sentence that keeps evidence, the end of a
-# case and its outcome apart
+# The three examples, in order: each title, and the sentences that keep evidence, the end of a
+# case and its outcome apart, and show that a case does not need a failure
 EXAMPLES = [
-    ("Bookings are paid before the event.",
-     "The matter is explained, but not over until the money arrives."),
-    ("Customers waiting on us get an answer within two working days.",
-     "That is evidence of an answer; a closed status alone is not. The wait is over, but the two-day target was missed."),
-    ("A significant revenue decline is understood and owned.",
-     "What ends this case, and what counts as a good outcome, depend on the expectations set beforehand."),
+    ("Bookings are paid before the event.", (
+        "The invoicing automation sent the invoice and, by its own measure, succeeded.",
+        "The matter is explained, but not over until the money arrives or, without a payment, "
+        "the customer cancels within the terms.",
+    )),
+    ("Customers waiting on us get an answer within two working days.", (
+        "That is evidence of an answer; a closed status alone is not. The wait is over, but the two-day target was missed.",
+    )),
+    ("A significant revenue decline is understood and owned.", (
+        "No one made a mistake and no task failed",
+        "they accept the lower level",
+        "What ends this case, and what counts as a good outcome, depend on the expectations set beforehand.",
+    )),
 ]
 examples = re.search(r'<ol class="examples"[^>]*>(.*?)</ol>', html, re.S)
 items = re.findall(r'<li class="card">(.*?)</li>', examples.group(1), re.S) if examples else []
 check(len(items) == len(EXAMPLES), f"index.html: {len(items)} examples, expected {len(EXAMPLES)}")
-for item, (title, sentence) in zip(items, EXAMPLES):
+for item, (title, sentences) in zip(items, EXAMPLES):
     check(f"<h3>{title}</h3>" in item, f"index.html: example title not verbatim: {title}")
-    check(sentence in item, f"index.html: {title}: missing: {sentence}")
+    for sentence in sentences:
+        check(sentence in item, f"index.html: {title}: missing: {sentence}")
 check("<details" not in html, "index.html: the examples have no disclosures")
 
 # The delegation story: four steps, closing its case on the recorded reply
