@@ -16,7 +16,7 @@
   <meta property="og:description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=d3f6cf77">
+  <link rel="stylesheet" href="styles.css?v=37c496f9">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -53,6 +53,7 @@
     <section id="how" class="section" aria-labelledby="how-title">
       <div class="wrap">
         <div class="section-head">
+          <p class="eyebrow">The core idea</p>
           <h2 id="how-title">Responsibilities stay. Matters come and go.</h2>
           <p>A responsibility says what should be true and who answers for it. Within it, each concrete matter that needs attention is a <strong>case</strong>: this customer, waiting for three days; this booking, still unpaid. Attention can mean a review, a decision, accepting something as it is, or an action.</p>
           <p>Cases come from facts. What the systems show, such as the support inbox or the payment system, is read against what is expected. Actions can change the situation; fresh evidence shows what changed. A case can end without the expected outcome being achieved.</p>
@@ -63,6 +64,7 @@
     <section id="examples" class="section" aria-labelledby="examples-title">
       <div class="wrap">
         <div class="section-head">
+          <p class="eyebrow">In practice</p>
           <h2 id="examples-title">Three responsibilities, three kinds of attention.</h2>
         </div>
         <ol class="examples" role="list">
@@ -85,6 +87,7 @@
     <section id="delegation" class="section" aria-labelledby="delegation-title">
       <div class="wrap">
         <div class="section-head">
+          <p class="eyebrow">Delegation</p>
           <h2 id="delegation-title">Delegate the work. Keep the responsibility.</h2>
           <p>A responsibility is about the state, not about who works on it, so it holds when the work changes hands. Take the support responsibility above.</p>
         </div>
@@ -101,6 +104,7 @@
     <section id="architecture" class="section" aria-labelledby="architecture-title">
       <div class="wrap">
         <div class="section-head">
+          <p class="eyebrow">How it works</p>
           <h2 id="architecture-title" class="stacked"><span>Observe deterministically.</span> <span>Judge probabilistically.</span> <span>Remember persistently.</span></h2>
         </div>
         <ol class="flow" role="list">
@@ -126,6 +130,7 @@
     <section id="developers" class="section" aria-labelledby="developers-title">
       <div class="wrap">
         <div class="section-head">
+          <p class="eyebrow">For developers</p>
           <h2 id="developers-title">Four functions. One responsibility lifecycle.</h2>
           <p>Responsibilities Core is the decision step in that loop, as four pure functions over plain JSON: deterministic TypeScript with no runtime dependencies. The same inputs give byte-identical outputs. It loads, stores, schedules, calls models and executes nothing, and has no clock: your code supplies the time.</p>
         </div>
@@ -154,6 +159,7 @@
     <section id="accountability" class="section" aria-labelledby="accountability-title">
       <div class="wrap">
         <div class="section-head">
+          <p class="eyebrow">Accountability</p>
           <h2 id="accountability-title">Delegating the work does not automatically transfer accountability.</h2>
           <p>People define what should be true and what agents and automations may do on their own. Accountability can change hands through an explicit handover. Every case can be checked against the facts behind it.</p>
           <p>It follows states in the world and runs alongside the work. Its view is only as current and complete as its observations. Steps that can’t be undone still need safeguards before they happen.</p>

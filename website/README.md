@@ -30,7 +30,8 @@ the checks: they print the link to use.
     python3 tests/check.py          # prints OK or the failed checks
 
 The checks cover, on both pages, well-formed markup, one `h1` and no skipped heading levels,
-no eyebrow labels above the headings, the meta tags, a link to the Impressum, a footer that
+an eyebrow label above each of the six section headings on the home page (none in the hero or
+on the Impressum), the meta tags, a link to the Impressum, a footer that
 repeats the claim, and that every link resolves (anchors on the other page included) and
 nothing external is loaded; plus the home page's key content (the hero word for word: claim,
 subhead and lede in order, and its two calls to action; the title with the short claim, and the

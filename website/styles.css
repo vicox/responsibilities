@@ -240,6 +240,16 @@ h1 {
   margin-bottom: 2.5rem;
 }
 
+/* A small label above a section heading, in the accent colour. 12px above the heading on phones, 16px from about 800px wide. */
+.eyebrow {
+  margin: 0 0 clamp(0.75rem, 1.5vw + 0.25rem, 1rem);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .section-head h2 {
   margin: 0;
   font-size: clamp(1.75rem, 2vw + 1rem, 2.5rem);

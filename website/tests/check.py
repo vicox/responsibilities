@@ -118,8 +118,9 @@ for name, canonical in PAGES.items():
     for prev, cur in zip(page.headings, page.headings[1:]):
         check(cur <= prev + 1, f"{name}: heading level jumps from h{prev} to h{cur}")
 
-    # No eyebrows: headings stand without a small label above them
-    check("eyebrow" not in html, f"{name}: no eyebrow labels above headings")
+    # The Impressum has no eyebrow; the home page's are checked below
+    if name == "impressum.html":
+        check("eyebrow" not in html, f"{name}: no eyebrow label above the headings")
 
     # Every page links to the Impressum
     check(any(url == "impressum.html" for _, _, url in page.links), f"{name}: no link to impressum.html")
@@ -252,6 +253,25 @@ order = [html.find(f'id="{section}"') for section in ("how", "examples", "delega
 check(-1 not in order and order == sorted(order),
       "index.html: sections must be ordered how, examples, delegation, architecture, developers, accountability")
 
+# Eyebrows: each section head opens with its label, directly before the h2; none in the hero.
+# The labels are written in sentence case; the stylesheet sets them in capitals.
+EYEBROWS = {
+    "how": "The core idea",
+    "examples": "In practice",
+    "delegation": "Delegation",
+    "architecture": "How it works",
+    "developers": "For developers",
+    "accountability": "Accountability",
+}
+for section, label in EYEBROWS.items():
+    body = re.search(rf'<section id="{section}"[^>]*>(.*?)</section>', html, re.S)
+    head = rf'<div class="section-head">\s*<p class="eyebrow">{re.escape(label)}</p>\s*<h2 id="{section}-title"'
+    check(body and re.search(head, body.group(1)),
+          f'index.html: #{section} must open its section head with <p class="eyebrow">{label}</p>, directly before its h2')
+eyebrows = html.count('class="eyebrow"')
+check(eyebrows == len(EYEBROWS), f"index.html: {eyebrows} eyebrows, expected {len(EYEBROWS)}, one per section")
+check(hero and "eyebrow" not in hero.group(1), "index.html: no eyebrow in the hero")
+
 # Retired wording stays gone: earlier examples and headings, and phrasings that claimed too much
 for phrase in (
     "Work in progress for days", "Blocked dependencies", "Recurring customer complaints", "Jira",
@@ -285,7 +305,9 @@ for phrase in (
 # colour schemes
 check(not re.search(r"https?://|@import", css), "styles.css must not load anything external")
 check(css.count("{") == css.count("}"), "unbalanced braces in styles.css")
-check("eyebrow" not in css, "styles.css: no eyebrow styles")
+eyebrow_rule = re.search(r"\.eyebrow\s*{([^}]*)}", css)
+check(eyebrow_rule and re.search(r"(?<![\w-])color:\s*var\(--accent\)", eyebrow_rule.group(1)),
+      "styles.css: the .eyebrow rule must exist and use color: var(--accent)")
 defined = set(re.findall(r"(--[\w-]+)\s*:", css))
 for prop in set(re.findall(r"var\((--[\w-]+)\)", css)):
     check(prop in defined, f"undefined custom property {prop}")
