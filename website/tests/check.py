@@ -152,16 +152,13 @@ html, page = pages["index.html"]
 for key in ("og:type", "og:site_name", "og:url", "og:title", "og:description", "twitter:card"):
     check(key in page.meta, f"index.html: missing meta {key}")
 check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
-# The hero, word for word and in order: the short claim, the line under it and the lede: two
-# short contradictions (the work succeeds or stops while the outcome is still missing), then the
-# benefit, and nothing more; the explanation follows in the sections. The
+# The hero, word for word and in order: the short claim, the line under it and the lede. The
 # title and footers carry the short claim; the description and Open Graph tags stand alone in a
 # search result or a shared link, so they carry the full positioning.
 H1 = "The responsibility layer."
 SUBHEAD = "For human, agent, and automated work."
-LEDE = ("An invoicing automation reports success. The booking is still unpaid. "
-        "An agent stops. The customer is still waiting. "
-        "Delegate the work without losing sight of the outcome.")
+LEDE = ("Customers need answers. Bookings need payment. "
+        "Your agents and automations can report success while neither has happened. How would you know?")
 TITLE = "Responsibilities — The responsibility layer"
 OG_TITLE = "The responsibility layer for human, agent, and automated work."
 DESCRIPTION = ("Define what should happen, recognise what needs attention, and follow each case through — "
@@ -187,7 +184,7 @@ for name in PAGES:
 # Required content, word for word
 for phrase in (
     "Responsibilities stay. Matters come and go.",
-    "Work can succeed and still miss what it was for.",
+    "The case didn’t come from the agent. It came from the fact that the customer was still waiting.",
     "A responsibility says what should be true and who answers for it.",
     "each concrete matter that needs attention is a <strong>case</strong>",
     "Actions can change the situation; fresh evidence shows what changed.",
@@ -197,7 +194,7 @@ for phrase in (
     "The responsibility layer holds what should be true, checks it against the facts, and follows each case through. "
     "It works alongside them, not instead of them.",
     "Delegate the work. Keep the responsibility.",
-    "Take a support responsibility: customers waiting on us get an answer within two working days.",
+    "Take support. You answer for this: customers waiting on us get an answer within two working days.",
     "That gives you a basis for handing over more, step by step, and improving the agent as you go.",
     "Three responsibilities, three kinds of attention.",
     "Not every case starts with a failure.",
@@ -212,7 +209,7 @@ for phrase in (
     "Accountability can change hands through an explicit handover.",
     "Its view is only as current and complete as its observations.",
     "Steps that can’t be undone still need safeguards before they happen.",
-    "<strong>Hand over more of the work. Keep each case in view, through to its outcome.</strong>",
+    "<strong>Delegate the work. Stay accountable for the outcome.</strong>",
 ):
     check(phrase in html, f"index.html: missing text: {phrase}")
 
@@ -269,13 +266,13 @@ check(functions and re.findall(r"<dt><code>(\w+)</code></dt>", functions.group(1
 developers = re.search(r'<section id="for-developers"(.*?)</section>', html, re.S)
 check(developers and f'href="{README}"' in developers.group(1), "index.html: For developers must link the README")
 
-# The story, in order: the idea, the delegation story, the examples, how it works, the developers'
-# view, and accountability, which closes the page with its takeaway and the README on GitHub.
+# The story, in order: the delegation story, the idea it shows, the examples, how it works, the
+# developers' view, and accountability, which closes the page with its takeaway and the README on GitHub.
 # Each section is named once: the eyebrow labels it, its id is that label in lower case with
 # hyphens, its h2 is <id>-title and labels the section, and the navigation on both pages lists
 # the same labels in the same order. The labels are written in sentence case; the stylesheet
 # sets them in capitals.
-EYEBROWS = ["The core idea", "Delegation", "In practice", "How it works", "For developers", "Accountability"]
+EYEBROWS = ["Delegation", "The core idea", "In practice", "How it works", "For developers", "Accountability"]
 SECTIONS = [label.lower().replace(" ", "-") for label in EYEBROWS]
 order = [html.find(f'<section id="{section}"') for section in SECTIONS]
 check(-1 not in order and order == sorted(order), f"index.html: sections must be ordered {', '.join(SECTIONS)}")
@@ -298,7 +295,7 @@ for name, prefix in (("index.html", "#"), ("impressum.html", "./#")):
 # The close: the takeaway ends the last section head, followed by the README on GitHub
 accountability = re.search(r'<section id="accountability"[^>]*>(.*?)</section>', html, re.S)
 check(accountability and re.search(
-    r"<p><strong>Hand over more of the work\. Keep each case in view, through to its outcome\.</strong> "
+    r"<p><strong>Delegate the work\. Stay accountable for the outcome\.</strong> "
     r"Start with one responsibility\.</p>\s*</div>\s*"
     + re.escape(f'<p class="cta"><a class="button" href="{README}">Get started on GitHub</a></p>')
     + r"\s*</div>\s*$", accountability.group(1)),
