@@ -167,12 +167,12 @@ hero = re.search(r'<section class="hero"[^>]*>(.*?)</section>', html, re.S)
 hero_lines = re.findall(r"<(h1|p) ([^>]*)>(.*?)</\1>", hero.group(1), re.S)[:3] if hero else []
 check(hero_lines == [("h1", 'id="hero-title"', H1), ("p", 'class="subhead"', SUBHEAD), ("p", 'class="lede"', LEDE)],
       f"index.html: the hero must open with the H1 '{H1}', then the subhead '{SUBHEAD}', then the lede, word for word")
-# Two CTAs, in order: the README on GitHub, then the explanation on this page
+# Two CTAs, in order: the README on GitHub, then the example that opens the story on this page
 cta = re.search(r'<p class="cta">(.*?)</p>', html, re.S)
 check(cta and re.findall(r"<a [^>]*>.*?</a>", cta.group(1), re.S) == [
     f'<a class="button" href="{README}">Get started on GitHub</a>',
-    '<a href="#how-it-works">See how it works <span aria-hidden="true">→</span></a>',
-], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See how it works →' (#how-it-works)")
+    '<a href="#delegation">See an example <span aria-hidden="true">→</span></a>',
+], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See an example →' (#delegation)")
 check(page.title == TITLE, f"index.html: title must be {TITLE!r}: {page.title!r}")
 check(page.meta.get("og:title") == [OG_TITLE], f"index.html: og:title must be the full positioning: {OG_TITLE}")
 check(page.meta.get("description") == [DESCRIPTION], "index.html: meta description is not verbatim")
@@ -268,12 +268,20 @@ check(developers and f'href="{README}"' in developers.group(1), "index.html: For
 
 # The story, in order: the delegation story, the idea it shows, the examples, how it works, the
 # developers' view, and accountability, which closes the page with its takeaway and the README on GitHub.
-# Each section is named once: the eyebrow labels it, its id is that label in lower case with
-# hyphens, its h2 is <id>-title and labels the section, and the navigation on both pages lists
-# the same labels in the same order. The labels are written in sentence case; the stylesheet
-# sets them in capitals.
-EYEBROWS = ["Delegation", "The core idea", "In practice", "How it works", "For developers", "Accountability"]
-SECTIONS = [label.lower().replace(" ", "-") for label in EYEBROWS]
+# Each section is named once: the eyebrow labels it, its h2 is <id>-title and labels the section,
+# and the navigation on both pages lists the same labels in the same order, each linking its
+# section. The ids stay stable when a label changes, so links into the page keep working. The
+# labels are written in sentence case; the stylesheet sets them in capitals.
+SECTION_LABELS = [
+    ("delegation", "An example"),
+    ("the-core-idea", "The core idea"),
+    ("in-practice", "In practice"),
+    ("how-it-works", "How it works"),
+    ("for-developers", "For developers"),
+    ("accountability", "Accountability"),
+]
+SECTIONS = [section for section, _ in SECTION_LABELS]
+EYEBROWS = [label for _, label in SECTION_LABELS]
 order = [html.find(f'<section id="{section}"') for section in SECTIONS]
 check(-1 not in order and order == sorted(order), f"index.html: sections must be ordered {', '.join(SECTIONS)}")
 check(len(re.findall(r'<section id="', html)) == len(SECTIONS), f"index.html: expected exactly the sections {SECTIONS}")
