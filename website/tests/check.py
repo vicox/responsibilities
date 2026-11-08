@@ -157,8 +157,7 @@ check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
 # search result or a shared link, so they carry the full positioning.
 H1 = "The responsibility layer."
 SUBHEAD = "For human, agent, and automated work."
-LEDE = ("Customers need answers. Bookings need payment. "
-        "Your agents and automations can report success while neither has happened. How would you know?")
+LEDE = "Customers need answers. Bookings need payment. The work can be delegated. The responsibility stays."
 TITLE = "Responsibilities — The responsibility layer"
 OG_TITLE = "The responsibility layer for human, agent, and automated work."
 DESCRIPTION = ("Define what should happen, recognise what needs attention, and follow each case through — "
