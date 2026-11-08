@@ -194,7 +194,7 @@ for phrase in (
     "It works alongside them, not instead of them.",
     "Delegate the work. Keep the responsibility.",
     "Take support. You answer for this: customers waiting on us get an answer within two working days.",
-    "That gives you a basis for handing over more, step by step, and improving the agent as you go.",
+    "That gives you a basis for handing over more, step by step.",
     "Three responsibilities, three kinds of attention.",
     "Not every case starts with a failure.",
     "<span>Observe deterministically.</span>",
@@ -315,7 +315,7 @@ for phrase in (
     "Five things that should never be forgotten", "Tasks end. Responsibilities don’t.",
     "Agents are responsible.", "Alina", "It takes both", "come back to your attention",
     "Who answers for it doesn’t", "not surveillance", "changes the world", "stops falling",
-    "Keep sight of what you",
+    "Keep sight of what you", "runs out of tokens", "the agent’s budget",
     "the support responsibility above",
 ):
     check(phrase not in html, f"index.html: superseded text: {phrase}")
