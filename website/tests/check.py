@@ -272,7 +272,7 @@ check(developers and f'href="{README}"' in developers.group(1), "index.html: For
 # section. The ids stay stable when a label changes, so links into the page keep working. The
 # labels are written in sentence case; the stylesheet sets them in capitals.
 SECTION_LABELS = [
-    ("delegation", "An example"),
+    ("delegation", "Example"),
     ("the-core-idea", "The core idea"),
     ("in-practice", "In practice"),
     ("how-it-works", "How it works"),
