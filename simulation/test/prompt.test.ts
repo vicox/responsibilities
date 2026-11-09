@@ -26,6 +26,12 @@ test("each day's prompt holds every observation so far and none of the rules", (
   }
 });
 
+test("the rules frame an Improvement as a possible gap, not an instruction", () => {
+  assert.ok(SYSTEM.includes("Attentions identify where action is needed; Improvements identify where something could work better."));
+  assert.ok(SYSTEM.includes("It is not an instruction or a redesign of the process; a person decides what, if anything, changes."));
+  assert.ok(SYSTEM.includes("state the gap in how the work is done, not what happened in one case, and no more certain than the evidence"));
+});
+
 test("the template names nothing of the scenario", () => {
   const source = readFileSync(new URL("prompt.ts", SIMULATION), "utf8") + SYSTEM + readFileSync(new URL("judge-schema.json", SIMULATION), "utf8");
   for (const word of ["dast", "f-17", "scan", "release", "xss", "verif", "bugcrowd", "macro"]) {

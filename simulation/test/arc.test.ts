@@ -27,6 +27,10 @@ test("the scripted arc passes every check, D5 is quiet and D6's reopening is ref
   assert.ok(Object.hasOwn(day(6).state!.cases[caseOf("F-17")]!.evidence, "prerelease-scan-d6"), "the new evidence is still linked");
   assert.match(run.console, /REOPEN_WHILE_CLOSING_MET on status/);
 
+  // D6's Improvement names a possible gap, resting on F-17's evidence and the scan.
+  assert.ok(run.console.includes("  - closed-before-fix-verified proposed: Security findings may be closed before fixes are independently verified\n"));
+  assert.ok(run.console.includes("    evidence: bugcrowd-d1, bugcrowd-d4, prerelease-scan-d6, pull-requests-d3\n"));
+
   // One sink: the inbox holds the two deliveries, each once.
   const inbox = run.file("inbox.md");
   assert.equal(inbox.match(/^## \[/gm)!.length, 2);

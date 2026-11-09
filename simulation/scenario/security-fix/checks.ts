@@ -1,6 +1,6 @@
 // The acceptance criteria of the security-fix scenario that code can decide. Whether an
-// Improvement's wording proposes a sensible change is for a person to judge; the report
-// shows it.
+// Improvement identifies a plausible gap, worded no more certainly than its evidence, is
+// for a person to judge; the report shows it.
 import { assess, digest } from "../../../src/index.ts";
 import type { Check } from "../../../src/index.ts";
 import type { CheckResult, DayResult, Scenario } from "../../loop.ts";
