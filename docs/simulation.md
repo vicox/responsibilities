@@ -134,7 +134,9 @@ Each live run is one row; a criterion is PASS or FAIL as `report.md` gives it. T
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 44 s, not reported | `xss-fix-validation` |
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 49 s, not reported | `macro-title-xss-regression` |
 
-With `claude`, a day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). With `codex`, a day took 5–12 seconds; all three runs used the judge with the tool features disabled. Whether each Improvement proposes a sensible change is still for a person to judge from the runs' reports.
+With `claude`, a day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). With `codex`, a day took 5–12 seconds; all three runs used the judge with the tool features disabled.
+
+**A person's verdict (2026-11-09).** The user reviewed the Improvements of these runs and accepted their wording and content: independent verification of a security fix before the finding is marked resolved at its source. The user also confirmed the scenario as it is, with its two cases, F-17 and DAST-301.
 
 What the runs showed beyond the checks:
 
