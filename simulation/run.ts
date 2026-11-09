@@ -1,4 +1,4 @@
-// npm run simulation -- --judge claude|codex [--model <name>] [--pause]
+// npm run simulation -- --judge claude|codex [--scenario security-fix|support-handoff] [--model <name>] [--pause]
 import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -7,34 +7,44 @@ import { codexJudge } from "./judges/codex.ts";
 import { stopAll } from "./judges/judge.ts";
 import { loadScenario, SIMULATION, simulate } from "./loop.ts";
 import { redactor } from "./redact.ts";
-import { checks } from "./scenario/security-fix/checks.ts";
+import { checks as securityFix } from "./scenario/security-fix/checks.ts";
+import { checks as supportHandoff } from "./scenario/support-handoff/checks.ts";
 
-export const USAGE = "usage: npm run simulation -- --judge claude|codex [--model <name>] [--pause]";
+/** The runnable scenarios, by their directory under scenario/, each with its checks. The first is the default. */
+export const SCENARIOS = { "security-fix": securityFix, "support-handoff": supportHandoff };
+export type ScenarioName = keyof typeof SCENARIOS;
+const NAMES = Object.keys(SCENARIOS) as ScenarioName[];
+
+export const USAGE = `usage: npm run simulation -- --judge claude|codex [--scenario ${NAMES.join("|")}] [--model <name>] [--pause]`;
 /** A planted secret: the run must end without its value anywhere in the run directory. */
 export const CANARY = "RESPONSIBILITIES_SIMULATION_CANARY_TOKEN";
 
 export interface Args {
   judge: "claude" | "codex";
+  scenario: ScenarioName;
   model?: string;
   pause: boolean;
 }
 
 export function parseArgs(argv: string[]): Args | string {
   let judge: string | undefined;
+  let scenario: string = NAMES[0]!;
   let model: string | undefined;
   let pause = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === "--judge" || arg === "--model") {
+    if (arg === "--judge" || arg === "--model" || arg === "--scenario") {
       const value = argv[++i];
       if (!value || value.startsWith("--")) return `${arg} needs a value`;
       if (arg === "--judge") judge = value;
+      else if (arg === "--scenario") scenario = value;
       else model = value;
     } else if (arg === "--pause") pause = true;
     else return `unknown argument: ${arg}`;
   }
   if (judge !== "claude" && judge !== "codex") return "--judge must be claude or codex";
-  return { judge, ...(model ? { model } : {}), pause };
+  if (!(NAMES as string[]).includes(scenario)) return `--scenario must be ${NAMES.join(" or ")}`;
+  return { judge, scenario: scenario as ScenarioName, ...(model ? { model } : {}), pause };
 }
 
 async function main(): Promise<number> {
@@ -61,7 +71,7 @@ async function main(): Promise<number> {
     process.stderr.write(`${refused}; nothing was run.\n`);
     return 2;
   }
-  const run_id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${args.judge}`;
+  const run_id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${args.scenario}-${args.judge}`;
   const dir = fileURLToPath(new URL(`runs/${run_id}/`, SIMULATION));
 
   let pause: (() => Promise<string | null>) | undefined;
@@ -77,8 +87,8 @@ async function main(): Promise<number> {
   }
   try {
     const outcome = await simulate({
-      judge, scenario: loadScenario("security-fix"), dir, run_id, env: process.env,
-      print: (text) => process.stdout.write(`${text}\n`), pause, checks,
+      judge, scenario: loadScenario(args.scenario), dir, run_id, env: process.env,
+      print: (text) => process.stdout.write(`${text}\n`), pause, checks: SCENARIOS[args.scenario],
     });
     process.stdout.write(`Journal, inbox and report: ${dir}\n`);
     return outcome.status === "failed" ? 1 : 0;

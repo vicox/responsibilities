@@ -1,12 +1,13 @@
 # Simulation
 
-The simulation runs one Responsibility through the core for six days, one day at a time, with a live LLM as the judge. It shows what the core decides and what it leaves to the model: cases, Attentions and their deliveries, and an Improvement the model finds on its own.
+The simulation runs one Responsibility through the core for six days, one day at a time, with a live LLM as the judge. It shows what the core decides and what it leaves to the model: cases, Attentions and their deliveries, and an Improvement the model finds on its own. There are two scenarios, with the same core, loop, prompt and judges: [`security-fix`](#scenario-security-fix-simulationscenariosecurity-fix) and [`support-handoff`](#scenario-support-handoff-simulationscenariosupport-handoff).
 
 ```sh
-npm run simulation -- --judge claude|codex [--model <name>] [--pause]
+npm run simulation -- --judge claude|codex [--scenario security-fix|support-handoff] [--model <name>] [--pause]
 ```
 
 - `--judge` — `claude` runs `claude -p`, `codex` runs `codex exec`. Each CLI uses its own login; the simulation reads no secrets.
+- `--scenario` — which scenario runs; `security-fix` without it.
 - `--model` — passed to the CLI; without it the CLI's default model judges.
 - `--pause` — waits after each day: Enter goes on, `q` stops, and the journal records the run as stopped. It needs an interactive terminal and exits before D1 without one.
 
@@ -24,7 +25,7 @@ Each day's observations arrive at 09:00Z and the judge answers at 18:00Z. Every 
 6. A trace check: all evidence of every case and Improvement must be a journaled `signal`, byte for byte, and every Attention event and delivery must belong to a case. A violation fails the day.
 7. The day's report: the context sent, the judge's answer, each proposal taken or refused with its code and trace, Attention events with each rule's result, deliveries and Improvements.
 
-## The scenario: `simulation/scenario/security-fix/`
+## Scenario `security-fix`: `simulation/scenario/security-fix/`
 
 The Responsibility `security-fixes-ship`: every security finding in our apps is triaged promptly and fixed before it reaches customers. One case per `finding`, keyed by `app` and `finding_id`.
 
@@ -45,11 +46,46 @@ Nothing in the Responsibility mentions re-testing a fix.
 
 A refusal is audit context only: the report shows it, and nothing cites it. An Improvement cites observations only, never a case or a refusal; which possible gap it identifies, and in what words, is the model's.
 
-`scripted.json` holds a judge's answers written by hand, one per day. Only the tests use it.
+`scripted.json` holds a judge's answers written by hand, one per day. Only the tests use it. Its D6 Improvement is worded as the user chose, an observation rather than a remedy:
+
+- title: "Security fixes may be closed without sufficient verification"
+- change: "How the effectiveness of a security fix is verified before its finding is closed."
+- rationale: "A previously resolved security finding was detected again during a pre-release scan. This suggests a potential gap in how the effectiveness of security fixes is verified before findings are closed."
+- cites: the scan, and F-17's report, fix and resolution.
+
+## Scenario `support-handoff`: `simulation/scenario/support-handoff/`
+
+The Responsibility `customer-support-quality` (Customer Support Quality): every customer case keeps moving until the customer's problem is solved, whichever team is working on it, and the customer never goes more than three days without an update from us. Accountable: `team:support`. One case per `customer_case`, keyed by `case`.
+
+- **Observations:** `support_cases`, the helpdesk's view of the case (status, linked ticket, last reply to the customer), and `engineering_tickets`, Engineering's ticket for it. Both are daily snapshots, and both list the customer case as their subject: when the case moves to Engineering, the Responsibility follows it there, and it stays one case.
+- **Closing:** "The customer's problem is solved and the case is solved in the helpdesk" — the helpdesk lists the case `solved`. It is not reached in six days.
+- **Success:** none.
+- **Attention type:** `escalation` (when the helpdesk lists the case `waiting_on_engineering`; delivered to `support-lead`). The rule confirms only that the case still waits on another team. Whether it has stalled, with nothing moving and no update for more than three days, is the model's to see.
+
+Nothing in the Responsibility mentions handoffs.
+
+| Day | New observations | What the core decides | What the model must see |
+|---|---|---|---|
+| D1 | Case SUP-1042 from Northwind Logistics: PDF export fails with error 500 for large spaces; `open`; Support replied the same morning | — | Open case SUP-1042, no Attention |
+| D2 | SUP-1042 `waiting_on_engineering`, handed over as ENG-311; the customer told "passed to our engineering team … we will keep you updated"; ENG-311 `To Do`, no assignee | — | Link the handoff, so Engineering's ticket is the case's evidence; no Attention yet |
+| D3, D4 | The same snapshots: ENG-311 unchanged since the handoff, no reply to the customer since D2 | Quiet: no Attention event, no delivery | Nothing, or new evidence on SUP-1042 |
+| D5 | The same snapshots, now more than three days after the handoff and the last update | Opening `escalation` passes its check; one delivery to `support-lead` | Open `escalation`: the case has stalled and a person must act now. Propose an Improvement, a possible gap in follow-up after a handoff, citing the handoff and the days without progress |
+| D6 | ENG-311 `In Progress`, assigned, commented "Picked up after the support lead's escalation"; the customer updated | No delivery | Close `escalation`. SUP-1042 stays open: the problem is not solved yet |
+
+**Attention now, Improvement structural.** The escalation is about this one case, now: a person must get it moving, and once someone has, it closes. The Improvement is about how the work is done: it outlives the escalation, rests on what the observations show, and stays in the state for a person to decide what, if anything, changes. It changes nothing by itself. The Responsibility, its rules and its observation kinds stay as they are, and nothing configures a Responsibility or adds a signal.
+
+This scenario's `scripted.json` holds the hand-written answers the tests use. Its Improvement, proposed on D5:
+
+- title: "Customer cases handed to another team may lose follow-up"
+- change: "How a case's progress and the customer's updates are followed up after the case is handed to another team."
+- rationale: "SUP-1042 was handed from Support to Engineering as ENG-311 on 2026-11-03. In the three days after that, ENG-311 had no assignee and no activity, and the customer received no update. This suggests a potential gap in how follow-up is owned once a case moves from Support to Engineering. It rests on one case, so how often this happens is not known."
+- cites: the handoff on D2 and the snapshots of D5, from both the helpdesk and Engineering.
 
 ## What a run leaves: `simulation/runs/<run id>/`
 
-- `journal.jsonl` — the one append-only journal: `run_started` (judge, model, flags, digests of the prompt template, the judge schema and the scenario), `signal`, `context` (basis and the full prompt), `judge_output` (raw output, parsed evaluation, duration, exit code, the no-tool proof, CLI version and model), `judge_failed`, `step` (every list of the step result, refusals with their traces), `delivery`, `trace_check`, `run_stopped`, `run_finished` (status, failed days, checks). Every history and check result is a view over it.
+The run id is the start time, the scenario and the judge, as in `2026-11-09T23-10-00-000Z-support-handoff-claude`. Runs from before `--scenario` existed are named without the scenario, and all of them ran `security-fix`.
+
+- `journal.jsonl` — the one append-only journal: `run_started` (judge, model, flags, the scenario's name, digests of the prompt template, the judge schema and the scenario), `signal`, `context` (basis and the full prompt), `judge_output` (raw output, parsed evaluation, duration, exit code, the no-tool proof, CLI version and model), `judge_failed`, `step` (every list of the step result, refusals with their traces), `delivery`, `trace_check`, `run_stopped`, `run_finished` (status, failed days, checks). Every history and check result is a view over it.
 - `inbox.md` — the single delivery sink, one block per delivery, labelled with its route. Nothing is posted anywhere else: no Slack, no webhook.
 - `report.md` — what the console showed, and the checks.
 
@@ -59,16 +95,28 @@ Everything written or printed is redacted first: the exact values of environment
 
 ## The checks
 
-At the end of a run, `simulation/scenario/security-fix/checks.ts` decides what code can:
+At the end of a run, the scenario's `checks.ts` decides what code can. For `security-fix`:
 
 - D1: case F-17 opens; `security_review` opens with its check `met`; exactly one delivery, to `security-oncall`.
 - By D4: `security_review` is closed.
 - D4: F-17 is resolved with its closing check met; `assess` is `unknown`.
 - D5: quiet.
 - D6: case DAST-301 opens citing the scan; `release_review` opens on it with both rules `met`; exactly one delivery, to `release-review`; an Improvement cites the scan and an F-17 observation from D1–D4.
+
+For `support-handoff`:
+
+- D1: case SUP-1042 opens; no Attention event, no delivery.
+- D2–D4: quiet (no Attention event, no delivery, no case opened or status changed). An escalation before three days have passed fails the run.
+- D5: `escalation` opens on SUP-1042 with its check `met`; exactly one delivery, to `support-lead`.
+- By D5: one case only, SUP-1042, with an `engineering_tickets` observation as its evidence.
+- D6: `escalation` closes, with no delivery; SUP-1042 stays open.
+- By D6: an Improvement cites the handoff (a D2 observation) and a day without progress (one from D3–D5).
+
+For both:
+
 - Every day: a usable answer, trace checks pass, no tool ran; all six days ran; no secret value in the run directory.
 
-Whether the Improvement identifies a plausible gap, no more certainly than its evidence allows, is for a person to judge from the report. A failed check or day makes the run FAILED and the exit code 1.
+Whether an Improvement observes a plausible gap, no more certainly than its evidence allows and without prescribing how to close it, is for a person to judge from the report. A failed check or day makes the run FAILED and the exit code 1.
 
 ## The judges
 
@@ -118,11 +166,13 @@ The tests check both judges against fake `claude` and `codex` executables first 
 
 ## Tests
 
-`npm test` runs the simulation's tests with the core's, with no network and no real CLI: the scripted six-day arc through the replay judge (every check above passes, D5 is quiet, D6's refusal is recorded, two runs give identical state digests), the prompt (every observation so far, no rule, no scenario word in the template, Improvements framed as possible gaps), parsing and the retry, the judges against fakes, redaction and `--pause`.
+`npm test` runs the simulation's tests with the core's, with no network and no real CLI: the scripted six-day arcs of both scenarios through the replay judge (every check above passes; for `security-fix`, D5 is quiet, D6's refusal is recorded and two runs give identical state digests; for `support-handoff`, one case across the handoff, one escalation that closes once a person acted while the Improvement stays, and an escalation on D4 fails the run), the prompt (every observation so far, no rule, no word of either scenario in the template, Improvements framed as observed possible gaps without remedies), parsing and the retry, the judges against fakes, redaction, the command line and `--pause`.
 
 ## Live results
 
 Each live run is one row; a criterion is PASS or FAIL as `report.md` gives it. The columns are the checks above; "every day" is a usable answer, trace checks and no tool, on all six days; "secrets" is the planted value absent from the run directory.
+
+### `security-fix`
 
 | Date | Judge | CLI | Model | D1 | By D4 | D4 | D5 quiet | D6 | Every day | Secrets | Time, cost | Improvements cited on D6 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -137,6 +187,8 @@ Each live run is one row; a criterion is PASS or FAIL as `report.md` gives it. T
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 73 s, $0.25 | `fix-scope-vs-reported-payload` (draft of the reframed rule 6) |
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 79 s, $0.26 | `fix-covers-vulnerability-class` (reframed rule 6) |
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 44 s, not reported | `macro-title-xss-fix-coverage` (reframed rule 6) |
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 47 s, not reported | `macro-title-xss-remediation-coverage` (rule 6 without remedies) |
+| 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 79 s, $0.25 | `fix-scope-vs-reported-payload` (rule 6 without remedies) |
 
 With `claude`, a day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). With `codex`, a day took 5–12 seconds; all three runs used the judge with the tool features disabled. The last four rows ran after the Improvements were reframed (below).
 
@@ -158,6 +210,28 @@ What the last four runs showed:
 - With the reframed rule, `codex` proposed one Improvement on D6: "Macro title XSS fixes may cover too few payload forms", change "Security fixes could cover the range of executable markup accepted in macro titles more completely". Hedged, but about the one sink rather than how findings are closed.
 - The two draft runs used rule 6 without "not what happened in one case". Both hedged ("may", "could"), and both titled the Improvement after the one case: "The F-17 fix may cover only the reported payload, not the whole XSS weakness" (`claude`, D3; its updates on D4–D6 stayed about F-17) and "Macro title XSS validation may miss alternative payloads" (`codex`, D6). That clause was added for it.
 
+**The user's wording, and no remedies (2026-11-09).** The user then chose the wording of the scripted D6 Improvement: "Security fixes may be closed without sufficient verification", because "a previously resolved security finding was detected again during a pre-release scan. This suggests a potential gap in how the effectiveness of security fixes is verified before findings are closed." Its change names only what could work better. Because the reframed runs still said how ("For example, check…"), rule 6 now also asks for what could work better, not how, and to propose no new step, check, tool, workflow, rule, signal or Responsibility; it calls Attentions action needed now, in one case, and Improvements how the work is done. The scenario, its two cases F-17 and DAST-301, the Attentions, the lifecycle and the checks are unchanged.
+
+What the last two runs showed, with that rule:
+
+- `claude` proposed one Improvement on D3 and updated it on D4–D6. On D6, with the scan: "Fixes for findings can cover only the reported payload, not the whole weakness class"; change "Before a finding counts as fixed, and before its fix ships in a release, there could be more confidence that the merged change covers the whole weakness class … not just the exact payload the reporter sent"; rationale ending "This suggests a finding can be counted as fixed, and its fix put in a release candidate, while the weakness class is still exploitable." It no longer says how to check.
+- `codex` proposed one on D6: "XSS remediation coverage may miss alternate payloads"; change "Completeness of remediation for script execution through macro titles could work better"; rationale ending "This suggests remediation coverage may have been narrower than the underlying vulnerability." No remedy, but still about the one sink.
+- Both still asked for `security_review` on DAST-301 on D6, refused as before.
+
+### `support-handoff`
+
+| Date | Judge | CLI | Model | D1 | D2–D4 quiet | D5 | One case, with Engineering's ticket | D6 | Improvement | Every day | Secrets | Time, cost | Improvements |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 52 s, not reported | `handoff-progress-and-customer-updates` (D6) |
+| 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 70 s, $0.27 | `handover-pickup-visibility` (D4), `customer-updates-while-waiting-on-other-team` (D5), both updated through D6 |
+
+Both runs used the rule 6 above. What they showed beyond the checks:
+
+- Both held back on D2–D4 and escalated on D5, each giving the reason in the case's own terms: `codex` "The engineering ticket remains unassigned and unchanged, and the customer has gone more than three days without an update"; `claude` "ENG-311 has had no assignee and no change since 2026-11-03, and the customer hasn't heard from us since 2026-11-03 08:40, more than three days ago". Both closed the escalation on D6 because the case was moving again and the customer had been updated, and left SUP-1042 open.
+- Both linked Engineering's ticket to SUP-1042 on D2, and neither opened a second case for ENG-311. The core refused nothing in either run.
+- `codex` proposed one Improvement on D6: "Continuity after engineering handoff may be falling short"; change "Maintaining case progress and timely customer updates while engineering owns the investigation could work better"; rationale ending "suggesting a gap in continuity after handoff". It names no remedy.
+- `claude` proposed one on D4, before the escalation, and a second on D5, and updated their rationale with each new day: "Cases handed to engineering may sit without an owner on the engineering side, and support may not see it", and "Customer updates may pause while a case waits on another team". Each rationale says what the snapshots show, then what that suggests ("This suggests …"; on D4, "This is one case, but it suggests …"). Their changes say what could work better ("Support could see more clearly, and sooner, whether a case handed to engineering has been picked up"); neither proposes a step, tool, rule, signal or Responsibility.
+
 ## Out of scope
 
-API adapters and real Slack or webhook delivery; resume, until or from; a person's decision on an Improvement; a multi-file store or compare-and-set; a website for the simulation; other scenarios; delivery to an agent.
+API adapters and real Slack or webhook delivery; resume, until or from; a person's decision on an Improvement; a multi-file store or compare-and-set; a website for the simulation; scenarios beyond these two; delivery to an agent; acting on an Improvement, such as changing a Responsibility or adding a signal.

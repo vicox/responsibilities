@@ -64,10 +64,10 @@
         }
       ],
       "improvements": [{
-        "key": "closed-before-fix-verified",
-        "title": "Security findings may be closed before fixes are independently verified",
-        "change": "A finding's resolution at its source could rest on evidence that the fix holds at the reported sink, not only on the fix being merged.",
-        "rationale": "F-17 was resolved at its source after a fix that removed only <img> elements, and no observation shows the fix checked against the reported sink before that. The pre-release scan DAST-301 of a build containing the fix then executed an <svg> payload through the same parameter and sink. This is one finding, so how often findings are closed this way is not known.",
+        "key": "fix-verification-gap",
+        "title": "Security fixes may be closed without sufficient verification",
+        "change": "How the effectiveness of a security fix is verified before its finding is closed.",
+        "rationale": "A previously resolved security finding was detected again during a pre-release scan. This suggests a potential gap in how the effectiveness of security fixes is verified before findings are closed.",
         "cites": ["prerelease-scan-d6", "bugcrowd-d1", "pull-requests-d3", "bugcrowd-d4"]
       }]
     }

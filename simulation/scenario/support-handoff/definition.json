@@ -1,0 +1,23 @@
+{
+  "id": "customer-support-quality",
+  "version": 1,
+  "identity": { "subject_type": "customer_case", "subject_keys": ["case"] },
+  "accountable": "team:support",
+  "expectations": "Every customer case keeps moving until the customer's problem is solved, whichever team is working on it, and the customer never goes more than three days without an update from us.",
+  "include": ["support_cases", "engineering_tickets"],
+  "closing": [
+    {
+      "description": "The customer's problem is solved and the case is solved in the helpdesk.",
+      "rules": [{ "kind": "support_cases", "match": { "case": "case" }, "where": { "status": "solved" } }]
+    }
+  ],
+  "success": [],
+  "attention_types": [
+    {
+      "key": "escalation",
+      "description": "The case has stalled while another team works on it: nothing has moved and the customer has heard nothing from us for more than three days. A support lead must get it moving again and see that the customer is updated.",
+      "when": [{ "kind": "support_cases", "match": { "case": "case" }, "where": { "status": "waiting_on_engineering" } }],
+      "delivery": { "route": "support-lead" }
+    }
+  ]
+}

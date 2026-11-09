@@ -99,7 +99,7 @@ export async function simulate(o: Options): Promise<Outcome> {
   journal.append({
     type: "run_started", at: clock(), run_id: o.run_id, judge: o.judge.name, model: o.judge.model, flags: o.judge.flags,
     prompt_template_digest: digest(SYSTEM + read(new URL("prompt.ts", SIMULATION))), judge_schema_digest: digest(JUDGE_SCHEMA),
-    scenario_digest: o.scenario.digest, node: process.version,
+    scenario: o.scenario.name, scenario_digest: o.scenario.digest, node: process.version,
   });
   say(report.header({ run_id: o.run_id, judge: o.judge.name, model: o.judge.model, dir: o.dir, scenario: o.scenario.name }));
 

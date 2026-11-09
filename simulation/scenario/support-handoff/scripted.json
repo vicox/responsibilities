@@ -1,0 +1,61 @@
+{
+  "note": "Judge outputs written by hand, one per day, in the judge-schema format. Only the tests use them, through judges/replay.ts.",
+  "days": {
+    "1": {
+      "proposals": [{
+        "subject_type": "customer_case",
+        "subject_keys": [{ "name": "case", "value": "SUP-1042" }],
+        "status": "open", "cites": ["support-cases-d1"],
+        "title": "PDF export fails with error 500 for large spaces",
+        "summary": "Reported by Northwind Logistics; Support replied the same morning.",
+        "attentions": []
+      }],
+      "improvements": []
+    },
+    "2": {
+      "proposals": [{
+        "subject_type": "customer_case",
+        "subject_keys": [{ "name": "case", "value": "SUP-1042" }],
+        "status": "open", "cites": ["support-cases-d2", "engineering-tickets-d2"],
+        "title": null, "summary": "Reproduced by Support and handed to Engineering as ENG-311; the customer was told.",
+        "attentions": []
+      }],
+      "improvements": []
+    },
+    "3": {
+      "proposals": [],
+      "improvements": []
+    },
+    "4": {
+      "proposals": [],
+      "improvements": []
+    },
+    "5": {
+      "proposals": [{
+        "subject_type": "customer_case",
+        "subject_keys": [{ "name": "case", "value": "SUP-1042" }],
+        "status": "open", "cites": ["support-cases-d5", "engineering-tickets-d5"],
+        "title": null,
+        "summary": "Waiting on Engineering since 2026-11-03: ENG-311 has no assignee and no activity, and the customer has had no update since then.",
+        "attentions": [{ "type": "escalation", "intent": "open", "reason": "More than three days since the handoff with no progress on ENG-311 and no update to the customer." }]
+      }],
+      "improvements": [{
+        "key": "follow-up-after-handoff",
+        "title": "Customer cases handed to another team may lose follow-up",
+        "change": "How a case's progress and the customer's updates are followed up after the case is handed to another team.",
+        "rationale": "SUP-1042 was handed from Support to Engineering as ENG-311 on 2026-11-03. In the three days after that, ENG-311 had no assignee and no activity, and the customer received no update. This suggests a potential gap in how follow-up is owned once a case moves from Support to Engineering. It rests on one case, so how often this happens is not known.",
+        "cites": ["support-cases-d2", "engineering-tickets-d2", "support-cases-d5", "engineering-tickets-d5"]
+      }]
+    },
+    "6": {
+      "proposals": [{
+        "subject_type": "customer_case",
+        "subject_keys": [{ "name": "case", "value": "SUP-1042" }],
+        "status": "open", "cites": ["engineering-tickets-d6", "support-cases-d6"],
+        "title": null, "summary": "Engineering picked up ENG-311 after the escalation and the customer was updated; the fix is still to come.",
+        "attentions": [{ "type": "escalation", "intent": "close", "reason": "ENG-311 is assigned and in progress, and the customer was updated on 2026-11-07." }]
+      }],
+      "improvements": []
+    }
+  }
+}

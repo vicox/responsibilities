@@ -10,7 +10,7 @@ import { redactDeep } from "./redact.ts";
 export type Entry =
   | {
     type: "run_started"; at: string; run_id: string; judge: string; model: string | null; flags: string[];
-    prompt_template_digest: string; judge_schema_digest: string; scenario_digest: string; node: string;
+    prompt_template_digest: string; judge_schema_digest: string; scenario: string; scenario_digest: string; node: string;
   }
   | { type: "signal"; day: number; observation: Observation }
   | { type: "context"; day: number; now: string; basis: string; system: string; prompt: string }

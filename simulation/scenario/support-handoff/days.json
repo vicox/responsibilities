@@ -1,0 +1,164 @@
+{
+  "description": "A customer case is reproduced by Support and handed to Engineering; for three days nothing moves on the Engineering ticket and the customer hears nothing; a support lead is asked to act, Engineering picks the ticket up and the customer is updated, while the case stays open.",
+  "days": [
+    {
+      "day": 1,
+      "observe_at": "2026-11-02T09:00:00.000Z",
+      "judge_at": "2026-11-02T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "support-cases-d1", "kind": "support_cases", "occurred_at": "2026-11-02T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "case": "SUP-1042", "customer": "Northwind Logistics", "subject": "PDF export fails with error 500 for large spaces",
+            "opened_at": "2026-11-02T07:50:00.000Z", "status": "open", "assignee": "support:dana", "linked_ticket": null,
+            "last_reply_to_customer_at": "2026-11-02T08:35:00.000Z",
+            "last_reply_to_customer": "Thanks for the report. We are looking into it and will get back to you."
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 2,
+      "observe_at": "2026-11-03T09:00:00.000Z",
+      "judge_at": "2026-11-03T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "support-cases-d2", "kind": "support_cases", "occurred_at": "2026-11-03T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "case": "SUP-1042", "customer": "Northwind Logistics", "subject": "PDF export fails with error 500 for large spaces",
+            "opened_at": "2026-11-02T07:50:00.000Z", "status": "waiting_on_engineering", "assignee": "support:dana", "linked_ticket": "ENG-311",
+            "handed_over_at": "2026-11-03T08:20:00.000Z",
+            "last_reply_to_customer_at": "2026-11-03T08:40:00.000Z",
+            "last_reply_to_customer": "We reproduced the problem and passed it to our engineering team. We will keep you updated."
+          }],
+          "complete": true
+        },
+        {
+          "id": "engineering-tickets-d2", "kind": "engineering_tickets", "occurred_at": "2026-11-03T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "ticket": "ENG-311", "support_case": "SUP-1042", "summary": "PDF export returns 500 for spaces over 500 pages (SUP-1042)",
+            "status": "To Do", "assignee": null, "created_at": "2026-11-03T08:20:00.000Z", "updated_at": "2026-11-03T08:20:00.000Z", "comments": 0
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 3,
+      "observe_at": "2026-11-04T09:00:00.000Z",
+      "judge_at": "2026-11-04T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "support-cases-d3", "kind": "support_cases", "occurred_at": "2026-11-04T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "case": "SUP-1042", "customer": "Northwind Logistics", "subject": "PDF export fails with error 500 for large spaces",
+            "opened_at": "2026-11-02T07:50:00.000Z", "status": "waiting_on_engineering", "assignee": "support:dana", "linked_ticket": "ENG-311",
+            "handed_over_at": "2026-11-03T08:20:00.000Z",
+            "last_reply_to_customer_at": "2026-11-03T08:40:00.000Z",
+            "last_reply_to_customer": "We reproduced the problem and passed it to our engineering team. We will keep you updated."
+          }],
+          "complete": true
+        },
+        {
+          "id": "engineering-tickets-d3", "kind": "engineering_tickets", "occurred_at": "2026-11-04T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "ticket": "ENG-311", "support_case": "SUP-1042", "summary": "PDF export returns 500 for spaces over 500 pages (SUP-1042)",
+            "status": "To Do", "assignee": null, "created_at": "2026-11-03T08:20:00.000Z", "updated_at": "2026-11-03T08:20:00.000Z", "comments": 0
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 4,
+      "observe_at": "2026-11-05T09:00:00.000Z",
+      "judge_at": "2026-11-05T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "support-cases-d4", "kind": "support_cases", "occurred_at": "2026-11-05T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "case": "SUP-1042", "customer": "Northwind Logistics", "subject": "PDF export fails with error 500 for large spaces",
+            "opened_at": "2026-11-02T07:50:00.000Z", "status": "waiting_on_engineering", "assignee": "support:dana", "linked_ticket": "ENG-311",
+            "handed_over_at": "2026-11-03T08:20:00.000Z",
+            "last_reply_to_customer_at": "2026-11-03T08:40:00.000Z",
+            "last_reply_to_customer": "We reproduced the problem and passed it to our engineering team. We will keep you updated."
+          }],
+          "complete": true
+        },
+        {
+          "id": "engineering-tickets-d4", "kind": "engineering_tickets", "occurred_at": "2026-11-05T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "ticket": "ENG-311", "support_case": "SUP-1042", "summary": "PDF export returns 500 for spaces over 500 pages (SUP-1042)",
+            "status": "To Do", "assignee": null, "created_at": "2026-11-03T08:20:00.000Z", "updated_at": "2026-11-03T08:20:00.000Z", "comments": 0
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 5,
+      "observe_at": "2026-11-06T09:00:00.000Z",
+      "judge_at": "2026-11-06T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "support-cases-d5", "kind": "support_cases", "occurred_at": "2026-11-06T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "case": "SUP-1042", "customer": "Northwind Logistics", "subject": "PDF export fails with error 500 for large spaces",
+            "opened_at": "2026-11-02T07:50:00.000Z", "status": "waiting_on_engineering", "assignee": "support:dana", "linked_ticket": "ENG-311",
+            "handed_over_at": "2026-11-03T08:20:00.000Z",
+            "last_reply_to_customer_at": "2026-11-03T08:40:00.000Z",
+            "last_reply_to_customer": "We reproduced the problem and passed it to our engineering team. We will keep you updated."
+          }],
+          "complete": true
+        },
+        {
+          "id": "engineering-tickets-d5", "kind": "engineering_tickets", "occurred_at": "2026-11-06T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "ticket": "ENG-311", "support_case": "SUP-1042", "summary": "PDF export returns 500 for spaces over 500 pages (SUP-1042)",
+            "status": "To Do", "assignee": null, "created_at": "2026-11-03T08:20:00.000Z", "updated_at": "2026-11-03T08:20:00.000Z", "comments": 0
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 6,
+      "observe_at": "2026-11-07T09:00:00.000Z",
+      "judge_at": "2026-11-07T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "engineering-tickets-d6", "kind": "engineering_tickets", "occurred_at": "2026-11-07T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "ticket": "ENG-311", "support_case": "SUP-1042", "summary": "PDF export returns 500 for spaces over 500 pages (SUP-1042)",
+            "status": "In Progress", "assignee": "dev:sam", "created_at": "2026-11-03T08:20:00.000Z", "updated_at": "2026-11-07T08:10:00.000Z", "comments": 1,
+            "last_comment": "Picked up after the support lead's escalation. Reproduced with a 600-page space: the export times out in the renderer."
+          }],
+          "complete": true
+        },
+        {
+          "id": "support-cases-d6", "kind": "support_cases", "occurred_at": "2026-11-07T09:00:00.000Z",
+          "subjects": [{ "type": "customer_case", "keys": { "case": "SUP-1042" } }],
+          "rows": [{
+            "case": "SUP-1042", "customer": "Northwind Logistics", "subject": "PDF export fails with error 500 for large spaces",
+            "opened_at": "2026-11-02T07:50:00.000Z", "status": "waiting_on_engineering", "assignee": "support:dana", "linked_ticket": "ENG-311",
+            "handed_over_at": "2026-11-03T08:20:00.000Z",
+            "last_reply_to_customer_at": "2026-11-07T08:30:00.000Z",
+            "last_reply_to_customer": "Sorry for the silence. Our engineers are now working on the export problem, and we will update you again by Tuesday."
+          }],
+          "complete": true
+        }
+      ]
+    }
+  ]
+}
