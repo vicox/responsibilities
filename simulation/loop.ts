@@ -9,7 +9,7 @@ import { Journal } from "./journal.ts";
 import type { Judge, JudgeAnswer } from "./judges/judge.ts";
 import { parse, ParseError } from "./parse.ts";
 import { render, retryNote, SYSTEM } from "./prompt.ts";
-import { redactor, secretValues } from "./redact.ts";
+import { leaks, redactor, secretValues, strings } from "./redact.ts";
 import * as report from "./report.ts";
 import { trace } from "./trace.ts";
 
@@ -128,6 +128,8 @@ export async function simulate(o: Options): Promise<Outcome> {
       const a = await o.judge.ask({ day: d.day, attempt, system: SYSTEM, prompt: last ? prompt + retryNote(last.error!) : prompt, schema: JUDGE_SCHEMA });
       let error = a.error;
       if (a.tool_free === false) failed = `a tool ran or was offered: ${a.tool_detail}`;
+      // Only an answer that proves no tool ran is used; one without proof counts as unusable.
+      if (!error && !failed && a.tool_free !== true) error = "the answer carries no proof that no tool ran";
       if (!error && !failed) {
         try {
           evaluation = parse(a.output, v.basis, o.judge.name);
@@ -145,8 +147,8 @@ export async function simulate(o: Options): Promise<Outcome> {
     }
     if (!evaluation && !failed) failed = `no usable answer after ${attempts.length} attempts: ${attempts.at(-1)!.error}`;
     say(report.answer(evaluation, attempts));
-    // No attempt showed a tool, and the answer that was used proved that none ran.
-    const tool_free = !attempts.some((a) => a.tool_free === false) && (!evaluation || attempts.at(-1)!.tool_free === true);
+    // No attempt showed a tool; an answer that was used proved that none ran.
+    const tool_free = !attempts.some((a) => a.tool_free === false);
 
     if (failed) {
       journal.append({ type: "judge_failed", day: d.day, reason: failed });
@@ -185,10 +187,11 @@ export async function simulate(o: Options): Promise<Outcome> {
 
   const checks = stopped || !o.checks ? [] : o.checks(results, o.scenario);
   const failedDays = results.filter((r) => r.failed).map((r) => r.day);
-  // Everything in the run directory so far, and the report about to be written.
+  // Everything in the run directory so far, the journal also decoded, and the report about to be written.
   const values = secretValues(o.env);
-  const secrets_absent = [...readdirSync(o.dir).map((name) => readFileSync(join(o.dir, name), "utf8")), ...text]
-    .every((content) => values.every((value) => !content.includes(value)));
+  const files = readdirSync(o.dir).map((name) => readFileSync(join(o.dir, name), "utf8"));
+  const decoded = journal.entries.flatMap((entry) => strings(entry));
+  const secrets_absent = ![...files, ...text, ...decoded].some((content) => leaks(content, values));
   const status = stopped ? "stopped" : failedDays.length || checks.some((c) => !c.ok) || !secrets_absent ? "failed" : "passed";
   say(report.summary(status, failedDays, checks, secrets_absent));
   writeFileSync(join(o.dir, "report.md"), text.join("\n"));

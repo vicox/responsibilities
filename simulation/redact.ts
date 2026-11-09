@@ -20,18 +20,46 @@ export const REDACTED = "[REDACTED]";
 export function secretValues(env: NodeJS.ProcessEnv): string[] {
   return Object.entries(env)
     .filter(([name, value]) => NAMES.test(name) && typeof value === "string" && value.length >= MIN_LENGTH)
-    .map(([, value]) => value!)
-    .sort((a, b) => b.length - a.length); // the longest first, so a value inside another goes with it
+    .map(([, value]) => value!);
 }
+
+/** A value as it stands in text, and as it stands inside a JSON string. */
+const forms = (value: string): string[] => [...new Set([value, JSON.stringify(value).slice(1, -1)])];
 
 export type Redact = (text: string) => string;
 
 export function redactor(env: NodeJS.ProcessEnv): Redact {
-  const values = secretValues(env);
+  // The longest first, so a value inside another goes with it.
+  const all = [...new Set(secretValues(env).flatMap(forms))].sort((a, b) => b.length - a.length);
   return (text) => {
     let out = text;
-    for (const value of values) out = out.split(value).join(REDACTED);
+    for (const value of all) out = out.split(value).join(REDACTED);
     for (const pattern of PATTERNS) out = out.replace(pattern, REDACTED);
     return out;
   };
 }
+
+/** A JSON value with every string and key redacted: redact before serializing, never after. */
+export function redactDeep<T>(value: T, redact: Redact): T {
+  if (typeof value === "string") return redact(value) as T;
+  if (Array.isArray(value)) return value.map((item) => redactDeep(item, redact)) as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      Object.defineProperty(out, redact(key), { value: redactDeep(item, redact), enumerable: true, writable: true, configurable: true });
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/** Every string and key in a JSON value. */
+export function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value && typeof value === "object") return Object.entries(value).flatMap(([key, item]) => [key, ...strings(item)]);
+  return [];
+}
+
+/** Whether a text holds one of the values, as it is or as it stands inside a JSON string. */
+export const leaks = (text: string, values: string[]): boolean => values.some((value) => forms(value).some((form) => text.includes(form)));

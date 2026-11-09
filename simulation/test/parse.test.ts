@@ -74,12 +74,22 @@ test("two unusable answers fail the day: judge_failed, no step, the state unchan
   assert.equal(run.results.length, 6, "the following days still run");
 });
 
-test("a failed attempt without a no-tool proof is retried; the answer used must carry the proof", async () => {
+test("an answer without a no-tool proof is never applied: it is retried, then the day fails", async () => {
   const retried = await runOnce({ judge: scriptedCalls([{ output: null, error: "claude timed out after 180 s", tool_free: null }]) });
   assert.equal(retried.status, "passed");
   assert.ok(retried.checks.find((c) => c.name === "Every day: no tool ran")!.ok);
-  const unproved = await runOnce({ judge: scriptedCalls([{ output: scripted["1"], tool_free: null }]) });
-  assert.equal(unproved.checks.find((c) => c.name === "Every day: no tool ran")!.ok, false);
+
+  const once = scriptedCalls([{ output: scripted["1"], tool_free: null }]);
+  const recovered = await runOnce({ judge: once });
+  assert.equal(recovered.status, "passed");
+  assert.match(once.requests[1]!.prompt, /no proof that no tool ran/);
+
+  const unproved = { output: scripted["1"], tool_free: null };
+  const failed = await runOnce({ judge: scriptedCalls([unproved, unproved]) });
+  assert.equal(failed.status, "failed");
+  const d1 = failed.journal.filter((e) => "day" in e && e.day === 1).map((e) => e.type);
+  assert.deepEqual(d1, ["signal", "context", "judge_output", "judge_output", "judge_failed"], "no step, no delivery");
+  assert.deepEqual([failed.results[0]!.result, failed.results[0]!.state], [null, null]);
 });
 
 test("a tool that ran fails the day at once, without a retry", async () => {

@@ -4,6 +4,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { claudeJudge } from "./judges/claude.ts";
 import { codexJudge } from "./judges/codex.ts";
+import { stopAll } from "./judges/judge.ts";
 import { loadScenario, SIMULATION, simulate } from "./loop.ts";
 import { redactor } from "./redact.ts";
 import { checks } from "./scenario/security-fix/checks.ts";
@@ -47,7 +48,19 @@ async function main(): Promise<number> {
     return 2;
   }
   process.env[CANARY] ??= randomBytes(16).toString("hex");
+  // A judge runs in its own process group, out of reach of the terminal's Ctrl+C: stop it here.
+  for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]] as const) {
+    process.on(signal, () => {
+      stopAll();
+      process.exit(code);
+    });
+  }
   const judge = args.judge === "claude" ? claudeJudge({ model: args.model }) : codexJudge({ model: args.model });
+  const refused = judge.preflight?.() ?? null;
+  if (refused) {
+    process.stderr.write(`${refused}; nothing was run.\n`);
+    return 2;
+  }
   const run_id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${args.judge}`;
   const dir = fileURLToPath(new URL(`runs/${run_id}/`, SIMULATION));
 

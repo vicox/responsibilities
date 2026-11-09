@@ -5,6 +5,7 @@ import type {
   AttentionEvent, Delivery, Evaluation, ImprovementEvent, Observation, Rejection, Transition,
 } from "../src/index.ts";
 import type { Redact } from "./redact.ts";
+import { redactDeep } from "./redact.ts";
 
 export type Entry =
   | {
@@ -39,7 +40,8 @@ export class Journal {
   }
 
   append(entry: Entry): void {
-    const line = this.redact(JSON.stringify(entry));
+    // Strings are redacted before they are escaped into JSON; the line once more for patterns.
+    const line = this.redact(JSON.stringify(redactDeep(entry, this.redact)));
     appendFileSync(this.path, `${line}\n`);
     this.entries.push(JSON.parse(line) as Entry);
   }

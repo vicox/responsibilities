@@ -53,7 +53,7 @@ A refusal is audit context only: the report shows it, and nothing cites it. An I
 - `inbox.md` — the single delivery sink, one block per delivery, labelled with its route. Nothing is posted anywhere else: no Slack, no webhook.
 - `report.md` — what the console showed, and the checks.
 
-Everything written or printed is redacted first: the exact values of environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD` (8 characters or more), and common key patterns. Each run plants a random value in `RESPONSIBILITIES_SIMULATION_CANARY_TOKEN` and fails if it, or any such value, appears in the run directory.
+Everything written or printed is redacted first: the exact values of environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD` (8 characters or more), as they stand in text and as they stand escaped inside a JSON string, and common key patterns. Journal entries are redacted string by string before they are serialized. Each run plants a random value in `RESPONSIBILITIES_SIMULATION_CANARY_TOKEN` and fails if it, or any such value, appears in the run directory, in either form or in the decoded journal.
 
 **Deliveries, exactly.** The core returns a delivery only for an opening or reopening of a routed type, with id `H([case_id, type, activation])`. The simulation writes each id to the inbox once per run, using an in-memory set. There is no crash safety and no at-most-once claim across process restarts.
 
@@ -72,7 +72,7 @@ Whether the Improvement proposes a sensible, evidence-backed change is for a per
 
 ## The judges
 
-Each judge runs without a shell, in a new empty temporary directory that is removed afterwards, with the prompt on stdin and a 180-second timeout. Every answer must carry the CLI's proof that no tool ran; an answer without it is unusable, and one that shows a tool fails the day at once.
+Each judge runs without a shell, in a new empty temporary directory that is removed afterwards, with the prompt on stdin and a 180-second timeout. The CLI leads its own process group: a timeout kills it with everything it started, and the call returns at most a second later even if a descendant still holds its output; an interrupted run (Ctrl+C) kills the group too. Every answer must carry the CLI's proof that no tool ran; an answer without it is unusable like any other (one retry, then `judge_failed`), and one that shows a tool fails the day at once.
 
 ### `claude` (Claude Code 2.1.319, verified)
 
@@ -86,7 +86,7 @@ Checked by running it on this machine (Phase 0):
 
 1. **Structured output.** With `--json-schema`, the answer is the `structured_output` of the final `result` event; the CLI validates it through a `StructuredOutput` tool. `parse.ts` and the core's schema validate it again.
 2. **No tool runs.** With `--tools ""` the `init` event lists `tools: ["StructuredOutput"]` and `mcp_servers: []`. Asked to read `package.json` from its working directory, it gave the answer the prompt allowed for "cannot read files", and the stream shows no tool use but `StructuredOutput`. The judge requires both in the `init` event, and that every `tool_use` is `StructuredOutput`. The `init` event still lists installed skills and plugins; with no tool on offer, none of them can run.
-3. **Isolation.** Under `--safe-mode`, the `CLAUDE.md` of a parent directory was not loaded: the probe ran below this workspace's `CLAUDE.md`, and asked whether it had been given instructions about the workspace, it said no. A `CLAUDE.md` planted in the judge's own temporary directory was not tried; the judge's directory is new and empty for every call.
+3. **Isolation.** A `CLAUDE.md` planted in an otherwise empty working directory named a project marker. Asked for the marker, `claude -p` without `--safe-mode` answered with it; with `--safe-mode` it answered that there was none. The `CLAUDE.md` of a parent directory (this workspace has one) was not loaded under `--safe-mode` either. The judge's own working directory is new and empty for every call.
 4. **No session written.** With `--no-session-persistence`, no transcript of the probe sessions appeared under `~/.claude/projects/`.
 5. **Failures.** An exceeded budget exits 1 with `is_error: true` and `subtype: "error_max_budget_usd"`; the budget is checked after a turn, so a turn can overspend once. An invalid API key exits 1 with `is_error: true` and `api_error_status: 401`.
 6. **Latency and cost.** See the results below.
@@ -99,7 +99,9 @@ codex exec --skip-git-repo-check --sandbox read-only --ephemeral --ignore-user-c
   --output-schema <file> --output-last-message <file> -C <empty dir> -      # rules and prompt on stdin
 ```
 
-These flags are the ones `codex exec --help` lists for codex-cli 0.160.0. Their behaviour is **not verified**: in the environment this was built in, every `codex` command needs an approval that was not available, and a nested probe from another Codex session failed in its sandbox before any model call ("failed to initialize in-process app-server client"). Two gaps are known: no flag stops Codex from reading an `AGENTS.md` in `CODEX_HOME` (only an empty `CODEX_HOME` with its own login would), and `project_doc_max_bytes=0` is documented but unproved. The judge's no-tool proof is that the JSONL events carry no item other than `agent_message` or `reasoning`; the answer is read from `--output-last-message`.
+These flags are the ones `codex exec --help` lists for codex-cli 0.160.0. Their behaviour is **not verified**: in the environment this was built in, every `codex` command needs an approval that was not available, and a nested probe from another Codex session failed in its sandbox before any model call ("failed to initialize in-process app-server client"). The judge's no-tool proof is that the JSONL events carry no item other than `agent_message` or `reasoning`; the answer is read from `--output-last-message`.
+
+No flag stops Codex from reading an `AGENTS.md` or `AGENTS.override.md` in its home (`CODEX_HOME`, else `~/.codex`), and its login lives in that home too, so the judge does not swap in an empty one. Instead it refuses to start while either file exists there, before D1, and names the file. `project_doc_max_bytes=0` keeps project documents out; it is documented, but unproved here.
 
 The tests check both judges against fake `claude` and `codex` executables first on `PATH`: the arguments, stdin, the empty temporary directory, the no-tool proof, timeouts and failures.
 
@@ -116,9 +118,10 @@ Each live run is one row; a criterion is PASS or FAIL as `report.md` gives it. T
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 112 s, not recorded | `hold-release-on-unverified-security-fix`, `verify-xss-fix-before-resolve` |
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 104 s, $0.28 | `xss-fix-verification` |
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 98 s, $0.28 | `xss-fix-verification`, `reopen-original-on-fix-bypass` |
+| 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 92 s, $0.26 | `verify-fix-before-resolving-at-source`, `xss-fix-at-sink-with-variant-tests`, `release-gate-covers-unverified-resolutions` |
 | — | codex | 0.160.0 | — | not run | | | | | | | | every `codex` command needs an approval that was not available |
 
-A day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal. Whether each Improvement proposes a sensible change is still for a person to judge from the runs' reports.
+A day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). Whether each Improvement proposes a sensible change is still for a person to judge from the runs' reports.
 
 What the runs showed beyond the checks:
 

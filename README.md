@@ -173,7 +173,7 @@ One host step. `askYourLLM` and `yourStore` stand for your own code; the library
 
 ```ts
 const v = view(definition, state, observations, now);
-const { proposals, improvements } = await askYourLLM(v);  // validate against schema.json#/$defs/evaluation
+const { proposals, improvements = [] } = await askYourLLM(v);  // validate against schema.json#/$defs/evaluation
 const r = step(definition, state, observations,
                { basis: v.basis, evaluator: "my-llm", proposals, improvements }, now);
 // One transaction, and only if the stored state_digest is still `readDigest`:

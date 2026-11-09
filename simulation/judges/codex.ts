@@ -1,12 +1,15 @@
 // `codex exec` as the judge. The flags are those `codex exec --help` lists for codex-cli
 // 0.160.0; their runtime behaviour is not yet proved here (see docs/simulation.md). The
 // proof that no tool ran: no item other than a message or reasoning in the JSONL events.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CliOptions, Judge, JudgeAnswer } from "./judge.ts";
 import { failure, inEmptyDir, lines, run, TIMEOUT_MS } from "./judge.ts";
 
 const QUIET_ITEMS = new Set(["agent_message", "reasoning"]);
+/** Instructions Codex loads from its home whatever the flags say. */
+const GLOBAL_INSTRUCTIONS = ["AGENTS.md", "AGENTS.override.md"];
 
 export function codexJudge(o: CliOptions = {}): Judge {
   const timeout_ms = o.timeout_ms ?? TIMEOUT_MS;
@@ -16,6 +19,14 @@ export function codexJudge(o: CliOptions = {}): Judge {
     "-c", "project_doc_max_bytes=0", "-c", "history.persistence=\"none\"", "--json", "--color", "never",
     ...(o.model ? ["-m", o.model] : []),
   ];
+  // The flags skip config.toml and project documents, but not the home's own instructions. Its
+  // login lives there too, so the home is not swapped for an empty one; the judge refuses to run
+  // while such a file exists.
+  const preflight = (): string | null => {
+    const home = env.CODEX_HOME || join(homedir(), ".codex");
+    const found = GLOBAL_INSTRUCTIONS.map((name) => join(home, name)).filter((path) => existsSync(path));
+    return found.length ? `codex would load ${found.join(" and ")} into the judge; move it away, or set CODEX_HOME to a home without it` : null;
+  };
   let version: Promise<string | null> | undefined;
   const cliVersion = (cwd: string) => (version ??= run("codex", ["--version"], { cwd, input: "", env, timeout_ms: 30_000 })
     .then((s) => /codex-cli\s+(\S+)/.exec(s.stdout)?.[1] ?? null));
@@ -23,7 +34,15 @@ export function codexJudge(o: CliOptions = {}): Judge {
     name: "codex",
     model: o.model ?? null,
     flags,
+    preflight,
     ask: ({ system, prompt, schema }) => inEmptyDir("responsibilities-codex-", async (root, work): Promise<JudgeAnswer> => {
+      const refused = preflight();
+      if (refused) {
+        return {
+          output: null, error: refused, tool_free: null, tool_detail: null, raw: "", stderr: "", exit_code: null, timed_out: false,
+          duration_ms: 0, cli_version: null, model: o.model ?? null, cost_usd: null,
+        };
+      }
       const schemaFile = join(root, "schema.json");
       const lastMessage = join(root, "last-message.json");
       writeFileSync(schemaFile, JSON.stringify(schema));

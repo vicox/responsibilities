@@ -13,6 +13,29 @@ import { calls } from "./recorder.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
+test("the README integration pattern runs, also when the LLM proposes no Improvements", async () => {
+  const readme = readFileSync(join(root, "README.md"), "utf8");
+  const section = /\n### Integration pattern\n([\s\S]*?)\n### /.exec(readme)?.[1] ?? "";
+  const block = /```ts\n([\s\S]*?)\n```/.exec(section)?.[1];
+  assert.ok(block, "the Integration pattern section has a ts block");
+  const source = `import { step, view } from ${JSON.stringify(pathToFileURL(join(root, "src/index.ts")).href)};
+export async function host({ definition, state, observations, now, askYourLLM, yourStore, readDigest }) {
+${block}
+}`;
+  const file = join(mkdtempSync(join(tmpdir(), "responsibilities-core-")), "host.ts");
+  writeFileSync(file, source);
+  const { host } = await import(pathToFileURL(file).href);
+  const { at, definition, openList, propose, attention } = await import("./helpers.ts");
+  const committed: { readDigest: string; record: { outbox: unknown[]; state_digest: string } }[] = [];
+  await host({
+    definition, state: null, observations: [openList("open-1", 2, [173])], now: at(2, 1), readDigest: digest(null),
+    askYourLLM: async () => ({ proposals: [propose(173, "open", ["open-1"], { attentions: [attention("needs_owner", "open")] })] }),
+    yourStore: { commitIf: async (readDigest: string, record: { outbox: unknown[]; state_digest: string }) => committed.push({ readDigest, record }) },
+  });
+  assert.equal(committed.length, 1);
+  assert.equal(committed[0]!.record.outbox.length, 1, "the delivery is in the outbox");
+});
+
 test("the README example runs, does what it says, and is the fixture", async () => {
   const readme = readFileSync(join(root, "README.md"), "utf8");
   const section = /\n## See it in action\n([\s\S]*?)\n## /.exec(readme)?.[1] ?? "";
