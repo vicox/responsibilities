@@ -53,7 +53,7 @@ A refusal is audit context only: the report shows it, and nothing cites it. An I
 - `inbox.md` — the single delivery sink, one block per delivery, labelled with its route. Nothing is posted anywhere else: no Slack, no webhook.
 - `report.md` — what the console showed, and the checks.
 
-Everything written or printed is redacted first: the exact values of environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD` (8 characters or more), as they stand in text and as they stand escaped inside a JSON string, and common key patterns. Journal entries are redacted string by string before they are serialized. Each run plants a random value in `RESPONSIBILITIES_SIMULATION_CANARY_TOKEN` and fails if it, or any such value, appears in the run directory, in either form or in the decoded journal.
+Everything written or printed is redacted first: the exact values of environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD` (8 characters or more), as they stand in text and as they stand escaped inside JSON, up to four levels deep (a CLI's event line carrying a message whose text is JSON, kept as a raw string in the journal), and common key patterns. Journal entries are redacted string by string before they are serialized. Each run plants a random value in `RESPONSIBILITIES_SIMULATION_CANARY_TOKEN` and fails if it, or any such value, appears in the run directory, in either form or in the decoded journal.
 
 **Deliveries, exactly.** The core returns a delivery only for an opening or reopening of a routed type, with id `H([case_id, type, activation])`. The simulation writes each id to the inbox once per run, using an in-memory set. There is no crash safety and no at-most-once claim across process restarts.
 

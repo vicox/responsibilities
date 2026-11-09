@@ -23,8 +23,18 @@ export function secretValues(env: NodeJS.ProcessEnv): string[] {
     .map(([, value]) => value!);
 }
 
-/** A value as it stands in text, and as it stands inside a JSON string. */
-const forms = (value: string): string[] => [...new Set([value, JSON.stringify(value).slice(1, -1)])];
+/**
+ * How deep a value may sit in JSON inside JSON: a CLI's event line (1) carrying a message whose
+ * text is JSON (2), kept as a raw string in a journal entry (3), and one level to spare.
+ */
+const NESTING = 4;
+
+/** A value as it stands in text, and as it stands inside a JSON string escaped up to `NESTING` times. */
+function forms(value: string): string[] {
+  const out = [value];
+  for (let i = 0; i < NESTING; i++) out.push(JSON.stringify(out.at(-1)!).slice(1, -1));
+  return [...new Set(out)];
+}
 
 export type Redact = (text: string) => string;
 

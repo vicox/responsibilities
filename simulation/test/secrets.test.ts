@@ -38,8 +38,11 @@ test("planted values never reach the journal, the inbox, the report or the conso
         for (const a of p.attentions) a.reason = `${a.reason} ${KEY} ${PASSWORD}`;
         if (p.title) p.title = `${p.title} ${PASSWORD}`; // it returns in the next day's prompt, JSON-escaped
       }
+      // As codex prints it: an event line whose message text is the answer as JSON, so the
+      // password inside is escaped twice before the journal escapes it once more.
+      const event = JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(output) } });
       return {
-        output, error: null, tool_free: true, tool_detail: `env ${TOKEN}`, raw: `raw ${KEY} ${TOKEN} ${JSON.stringify(PASSWORD)}`, stderr: `warning: ${PASSWORD}`,
+        output, error: null, tool_free: true, tool_detail: `env ${TOKEN}`, raw: `raw ${KEY} ${TOKEN} ${JSON.stringify(PASSWORD)}\n${event}`, stderr: `warning: ${PASSWORD}`,
         exit_code: 0, timed_out: false, duration_ms: 1, cli_version: null, model: null, cost_usd: null,
       };
     },
@@ -52,4 +55,24 @@ test("planted values never reach the journal, the inbox, the report or the conso
   }
   assert.equal(leaks(run.journal.flatMap((e) => strings(e)).join("\n"), planted), false, "the decoded journal holds a planted value");
   assert.ok(run.file("inbox.md").includes(REDACTED), "the reason reached the inbox, redacted");
+
+  // Decode the nested message the way a reader would: entry -> raw event line -> message text -> answer.
+  const nested = run.journal.flatMap((e) => (e.type === "judge_output" ? e.raw.split("\n").slice(1) : []))
+    .map((line) => JSON.parse(line) as { item: { text: string } })
+    .map((event) => JSON.parse(event.item.text) as unknown);
+  assert.equal(nested.length, 6);
+  for (const answer of nested) {
+    for (const s of strings(answer)) for (const value of planted) assert.ok(!s.includes(value), `a nested answer holds ${value}`);
+  }
+  assert.ok(strings(nested[0]).some((s) => s.includes(REDACTED)), "the nested answer was redacted, not dropped");
+});
+
+test("redaction reaches values escaped more than once", () => {
+  const redact = redactor(env);
+  let text = `title ${PASSWORD}`;
+  for (let depth = 0; depth < 4; depth++) {
+    assert.equal(redact(text).includes("back-123"), false, `escaped ${depth} times`);
+    assert.equal(leaks(text, planted), true);
+    text = JSON.stringify(text);
+  }
 });
