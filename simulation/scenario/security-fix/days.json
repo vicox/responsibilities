@@ -1,0 +1,129 @@
+{
+  "description": "A reported stored XSS is triaged, fixed, merged, tested and resolved at its source; a release candidate containing the fix waits to ship; an independent scan of that candidate finds the same sink still exploitable.",
+  "days": [
+    {
+      "day": 1,
+      "observe_at": "2026-11-02T09:00:00.000Z",
+      "judge_at": "2026-11-02T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "bugcrowd-d1", "kind": "bugcrowd_findings", "occurred_at": "2026-11-02T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "F-17" } }],
+          "rows": [{
+            "app": "macro-studio", "finding_id": "F-17", "title": "Stored XSS in macro title",
+            "cwe": "CWE-79", "location": "POST /rest/macro/preview", "parameter": "title",
+            "sink": "macro title rendered on page view", "payload": "<img src=x onerror=alert(document.domain)>",
+            "reported_at": "2026-11-01T21:14:00.000Z", "state": "triaging"
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 2,
+      "observe_at": "2026-11-03T09:00:00.000Z",
+      "judge_at": "2026-11-03T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "bugcrowd-d2", "kind": "bugcrowd_findings", "occurred_at": "2026-11-03T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "F-17" } }],
+          "rows": [{
+            "app": "macro-studio", "finding_id": "F-17", "title": "Stored XSS in macro title",
+            "cwe": "CWE-79", "severity": "P2", "state": "accepted", "triaged_by": "security-oncall"
+          }],
+          "complete": true
+        },
+        {
+          "id": "tickets-d2", "kind": "tickets", "occurred_at": "2026-11-03T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "F-17" } }],
+          "rows": [{
+            "ticket": "SEC-42", "app": "macro-studio", "finding_id": "F-17",
+            "summary": "Fix stored XSS in macro title (F-17)", "status": "In Progress", "assignee": "dev-team"
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 3,
+      "observe_at": "2026-11-04T09:00:00.000Z",
+      "judge_at": "2026-11-04T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "pull-requests-d3", "kind": "pull_requests", "occurred_at": "2026-11-04T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "F-17" } }],
+          "rows": [{
+            "number": 88, "app": "macro-studio", "refs": "SEC-42", "finding_id": "F-17", "state": "merged",
+            "merge_commit": "c0ffee1", "change": "remove <img> elements from macro title before rendering"
+          }],
+          "complete": true
+        },
+        {
+          "id": "ci-runs-d3", "kind": "ci_runs", "occurred_at": "2026-11-04T09:00:00.000Z",
+          "subjects": [],
+          "rows": [{ "app": "macro-studio", "commit": "c0ffee1", "branch": "main", "result": "passed", "suites": ["unit", "integration"] }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 4,
+      "observe_at": "2026-11-05T09:00:00.000Z",
+      "judge_at": "2026-11-05T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "tickets-d4", "kind": "tickets", "occurred_at": "2026-11-05T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "F-17" } }],
+          "rows": [{
+            "ticket": "SEC-42", "app": "macro-studio", "finding_id": "F-17",
+            "summary": "Fix stored XSS in macro title (F-17)", "status": "Done", "fix_commit": "c0ffee1"
+          }],
+          "complete": true
+        },
+        {
+          "id": "bugcrowd-d4", "kind": "bugcrowd_findings", "occurred_at": "2026-11-05T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "F-17" } }],
+          "rows": [{
+            "app": "macro-studio", "finding_id": "F-17", "title": "Stored XSS in macro title",
+            "cwe": "CWE-79", "severity": "P2", "state": "resolved", "resolution_note": "Fixed in SEC-42"
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 5,
+      "observe_at": "2026-11-06T09:00:00.000Z",
+      "judge_at": "2026-11-06T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "release-candidates-d5", "kind": "release_candidates", "occurred_at": "2026-11-06T09:00:00.000Z",
+          "subjects": [],
+          "rows": [{
+            "app": "macro-studio", "version": "3.2.0-rc1", "commit": "d00d2b7", "contains": ["c0ffee1"],
+            "status": "awaiting_release", "planned_release": "2026-11-09"
+          }],
+          "complete": true
+        }
+      ]
+    },
+    {
+      "day": 6,
+      "observe_at": "2026-11-07T09:00:00.000Z",
+      "judge_at": "2026-11-07T18:00:00.000Z",
+      "observations": [
+        {
+          "id": "prerelease-scan-d6", "kind": "prerelease_scan", "occurred_at": "2026-11-07T09:00:00.000Z",
+          "subjects": [{ "type": "finding", "keys": { "app": "macro-studio", "finding_id": "DAST-301" } }],
+          "rows": [{
+            "app": "macro-studio", "finding_id": "DAST-301", "tool": "DAST", "target_version": "3.2.0-rc1", "target_commit": "d00d2b7",
+            "cwe": "CWE-79", "location": "POST /rest/macro/preview", "parameter": "title",
+            "sink": "macro title rendered on page view", "payload": "<svg/onload=alert(document.domain)>",
+            "result": "payload persisted and executed on page view", "state": "open"
+          }],
+          "complete": true
+        }
+      ]
+    }
+  ]
+}

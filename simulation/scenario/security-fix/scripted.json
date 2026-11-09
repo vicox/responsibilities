@@ -1,0 +1,75 @@
+{
+  "note": "Judge outputs written by hand, one per day, in the judge-schema format. Only the tests use them, through judges/replay.ts.",
+  "days": {
+    "1": {
+      "proposals": [{
+        "subject_type": "finding",
+        "subject_keys": [{ "name": "app", "value": "macro-studio" }, { "name": "finding_id", "value": "F-17" }],
+        "status": "open", "cites": ["bugcrowd-d1"],
+        "title": "Stored XSS in macro title", "summary": "Reported through Bugcrowd and waiting for triage.",
+        "attentions": [{ "type": "security_review", "intent": "open", "reason": "A new stored XSS report waits for triage." }]
+      }],
+      "improvements": []
+    },
+    "2": {
+      "proposals": [{
+        "subject_type": "finding",
+        "subject_keys": [{ "name": "app", "value": "macro-studio" }, { "name": "finding_id", "value": "F-17" }],
+        "status": "open", "cites": ["bugcrowd-d2", "tickets-d2"],
+        "title": null, "summary": "Accepted as P2; SEC-42 is in progress.",
+        "attentions": [{ "type": "security_review", "intent": "close", "reason": "Triaged and accepted; a fix ticket exists." }]
+      }],
+      "improvements": []
+    },
+    "3": {
+      "proposals": [{
+        "subject_type": "finding",
+        "subject_keys": [{ "name": "app", "value": "macro-studio" }, { "name": "finding_id", "value": "F-17" }],
+        "status": "open", "cites": ["pull-requests-d3", "ci-runs-d3"],
+        "title": null, "summary": "Fix merged as c0ffee1; CI passed on main.",
+        "attentions": []
+      }],
+      "improvements": []
+    },
+    "4": {
+      "proposals": [{
+        "subject_type": "finding",
+        "subject_keys": [{ "name": "app", "value": "macro-studio" }, { "name": "finding_id", "value": "F-17" }],
+        "status": "resolved", "cites": ["tickets-d4", "bugcrowd-d4"],
+        "title": null, "summary": "Resolved on Bugcrowd after SEC-42 was done.",
+        "attentions": []
+      }],
+      "improvements": []
+    },
+    "5": {
+      "proposals": [],
+      "improvements": []
+    },
+    "6": {
+      "proposals": [
+        {
+          "subject_type": "finding",
+          "subject_keys": [{ "name": "app", "value": "macro-studio" }, { "name": "finding_id", "value": "DAST-301" }],
+          "status": "open", "cites": ["prerelease-scan-d6", "release-candidates-d5"],
+          "title": "Stored XSS in macro title still exploitable in 3.2.0-rc1",
+          "summary": "The pre-release scan of 3.2.0-rc1 (d00d2b7, which contains c0ffee1) executed a payload through the same parameter and sink as F-17.",
+          "attentions": [{ "type": "release_review", "intent": "open", "reason": "3.2.0-rc1 awaits release with an open stored XSS against it." }]
+        },
+        {
+          "subject_type": "finding",
+          "subject_keys": [{ "name": "app", "value": "macro-studio" }, { "name": "finding_id", "value": "F-17" }],
+          "status": "open", "cites": ["prerelease-scan-d6"],
+          "title": null, "summary": null,
+          "attentions": []
+        }
+      ],
+      "improvements": [{
+        "key": "confirm-fix-against-original-report",
+        "title": "Confirm a fix against the reported payload class before resolving",
+        "change": "Before a finding is resolved at its source, re-test the fixed build against the reported sink with more than the reported payload, and record the result as evidence.",
+        "rationale": "F-17 was resolved after a fix that removed only <img> elements; the scan of a build containing that fix executed an <svg> payload through the same parameter and sink.",
+        "cites": ["prerelease-scan-d6", "bugcrowd-d1", "pull-requests-d3", "bugcrowd-d4"]
+      }]
+    }
+  }
+}

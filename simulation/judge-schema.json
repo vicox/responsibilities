@@ -1,0 +1,59 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proposals", "improvements"],
+  "properties": {
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["subject_type", "subject_keys", "status", "cites", "title", "summary", "attentions"],
+        "properties": {
+          "subject_type": { "type": "string" },
+          "subject_keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "value"],
+              "properties": { "name": { "type": "string" }, "value": { "type": "string" } }
+            }
+          },
+          "status": { "type": "string", "enum": ["open", "resolved"] },
+          "cites": { "type": "array", "items": { "type": "string" } },
+          "title": { "type": ["string", "null"] },
+          "summary": { "type": ["string", "null"] },
+          "attentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "intent", "reason"],
+              "properties": {
+                "type": { "type": "string" },
+                "intent": { "type": "string", "enum": ["open", "keep", "close"] },
+                "reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "improvements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "title", "change", "rationale", "cites"],
+        "properties": {
+          "key": { "type": "string" },
+          "title": { "type": "string" },
+          "change": { "type": "string" },
+          "rationale": { "type": "string" },
+          "cites": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

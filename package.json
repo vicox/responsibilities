@@ -17,8 +17,9 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "test": "tsc --noEmit && node --test test/*.test.ts",
-    "fixtures": "UPDATE_FIXTURES=1 node --test test/readme.test.ts test/attention.test.ts"
+    "test": "tsc --noEmit && node --test test/*.test.ts simulation/test/*.test.ts",
+    "fixtures": "UPDATE_FIXTURES=1 node --test test/readme.test.ts test/attention.test.ts",
+    "simulation": "node simulation/run.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
