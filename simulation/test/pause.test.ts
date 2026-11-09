@@ -4,20 +4,31 @@ import { chmodSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { SIMULATION } from "../loop.ts";
-import { parseArgs } from "../run.ts";
+import { loadScenario, SIMULATION } from "../loop.ts";
+import { parseArgs, SCENARIOS } from "../run.ts";
 import { runOnce, tempDir } from "./helpers.ts";
 
 const RUN = fileURLToPath(new URL("run.ts", SIMULATION));
 
-test("the command line takes a live judge, a model and --pause, nothing else", () => {
-  assert.deepEqual(parseArgs(["--judge", "claude"]), { judge: "claude", pause: false });
-  assert.deepEqual(parseArgs(["--judge", "codex", "--model", "gpt-x", "--pause"]), { judge: "codex", model: "gpt-x", pause: true });
+test("the command line takes a live judge, a scenario, a model and --pause, nothing else", () => {
+  assert.deepEqual(parseArgs(["--judge", "claude"]), { judge: "claude", scenario: "security-fix", pause: false });
+  assert.deepEqual(parseArgs(["--judge", "codex", "--model", "gpt-x", "--pause"]), { judge: "codex", scenario: "security-fix", model: "gpt-x", pause: true });
+  assert.deepEqual(parseArgs(["--scenario", "support-handoff", "--judge", "claude"]), { judge: "claude", scenario: "support-handoff", pause: false });
   assert.equal(parseArgs([]), "--judge must be claude or codex");
   assert.equal(parseArgs(["--judge", "replay"]), "--judge must be claude or codex");
   assert.equal(parseArgs(["--judge"]), "--judge needs a value");
+  assert.equal(parseArgs(["--judge", "claude", "--scenario"]), "--scenario needs a value");
+  assert.equal(parseArgs(["--judge", "claude", "--scenario", "billing"]), "--scenario must be security-fix or support-handoff");
   assert.equal(parseArgs(["--judge", "claude", "--until", "4"]), "unknown argument: --until");
   assert.equal(parseArgs(["--judge", "claude", "--resume"]), "unknown argument: --resume");
+});
+
+test("every scenario on the command line loads, with its checks", () => {
+  for (const [name, checks] of Object.entries(SCENARIOS)) {
+    const scenario = loadScenario(name);
+    assert.equal(scenario.days.length, 6, name);
+    assert.ok(checks([], scenario).some((c) => !c.ok), `${name}: no result passes no check`);
+  }
 });
 
 test("--pause without a terminal exits before D1, starting no judge and writing no run", () => {
@@ -40,7 +51,7 @@ test("--pause without a terminal exits before D1, starting no judge and writing 
 test("a bad argument prints the usage and exits 2", () => {
   const r = spawnSync(process.execPath, [RUN, "--judge", "replay"], { encoding: "utf8" });
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /usage: npm run simulation -- --judge claude\|codex/);
+  assert.match(r.stderr, /usage: npm run simulation -- --judge claude\|codex \[--scenario security-fix\|support-handoff\]/);
 });
 
 const lines = (...input: (string | null)[]) => async () => (input.length ? input.shift()! : null);

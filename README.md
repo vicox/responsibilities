@@ -151,7 +151,7 @@ const a = assess(definition2, c.state, caseId, [answered], later);
 
 The case is over, and its success criterion was not met. The core keeps both facts apart.
 
-For a longer run, the [simulation](docs/simulation.md) takes a six-day security-fix scenario through the core, one day at a time, with a live LLM as the judge.
+For a longer run, the [simulation](docs/simulation.md) takes a six-day scenario through the core, one day at a time, with a live LLM as the judge: a security fix that does not hold, or a customer case handed from Support to Engineering and then forgotten.
 
 ## Integration
 
