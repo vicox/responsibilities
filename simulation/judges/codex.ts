@@ -1,22 +1,32 @@
-// `codex exec` as the judge. The flags are those `codex exec --help` lists for codex-cli
-// 0.160.0; their runtime behaviour is not yet proved here (see docs/simulation.md). The
-// proof that no tool ran: no item other than a message or reasoning in the JSONL events.
+// `codex exec` as the judge, with the flags proved in Phase 0 for codex-cli 0.160.0 (see
+// docs/simulation.md). `--sandbox read-only` alone still lets the model run read commands and
+// loads MCP servers from apps and plugins, so every feature that offers a tool is disabled. The
+// proof that no tool ran: no item other than a message, reasoning or an error in the JSONL events.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CliOptions, Judge, JudgeAnswer } from "./judge.ts";
 import { failure, inEmptyDir, lines, run, TIMEOUT_MS } from "./judge.ts";
 
-const QUIET_ITEMS = new Set(["agent_message", "reasoning"]);
+/** Items that are not a tool: the answer, reasoning, and a warning or error Codex reports. */
+const QUIET_ITEMS = new Set(["agent_message", "reasoning", "error"]);
 /** Instructions Codex loads from its home whatever the flags say. */
 const GLOBAL_INSTRUCTIONS = ["AGENTS.md", "AGENTS.override.md"];
+/** The features of codex-cli 0.160.0 that give the model a tool, MCP servers included. */
+export const TOOL_FEATURES = [
+  "shell_tool", "unified_exec", "apps", "plugins", "remote_plugin", "browser_use", "browser_use_external", "in_app_browser",
+  "computer_use", "image_generation", "multi_agent", "view_image", "hooks", "sleep_tool", "skill_search",
+  "skill_mcp_dependency_install", "tool_suggest", "goals", "workspace_dependencies",
+];
 
 export function codexJudge(o: CliOptions = {}): Judge {
   const timeout_ms = o.timeout_ms ?? TIMEOUT_MS;
   const env = o.env ?? process.env;
   const flags = [
     "exec", "--skip-git-repo-check", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-    "-c", "project_doc_max_bytes=0", "-c", "history.persistence=\"none\"", "--json", "--color", "never",
+    "-c", "project_doc_max_bytes=0", "-c", "history.persistence=\"none\"",
+    ...TOOL_FEATURES.flatMap((feature) => ["--disable", feature]),
+    "--json", "--color", "never",
     ...(o.model ? ["-m", o.model] : []),
   ];
   // The flags skip config.toml and project documents, but not the home's own instructions. Its
@@ -54,7 +64,10 @@ export function codexJudge(o: CliOptions = {}): Judge {
       const tools = [...new Set(items.filter((type) => !QUIET_ITEMS.has(type)))];
       const started = events.some((e) => e.type === "thread.started" || e.type === "turn.started");
       const tool_free = started ? tools.length === 0 : null;
-      const tool_detail = started ? `item types: [${[...new Set(items)].join(", ")}]` : null;
+      const warnings = events.filter((e) => e.type === "item.completed" && e.item?.type === "error").map((e) => String(e.item.message));
+      const tool_detail = started
+        ? `item types: [${[...new Set(items)].join(", ")}]${warnings.length ? `; codex reported: ${warnings.join(" | ")}` : ""}`
+        : null;
 
       let output: unknown = null;
       let unreadable: string | null = null;
@@ -63,7 +76,10 @@ export function codexJudge(o: CliOptions = {}): Judge {
       } catch (e) {
         unreadable = (e as NodeJS.ErrnoException).code === "ENOENT" ? "codex wrote no last message" : "codex's last message is not JSON";
       }
-      const error = failure(s, "codex", timeout_ms)
+      // Codex reports a failed turn on stdout, not on stderr.
+      const turnFailed = events.filter((e) => e.type === "turn.failed").map((e) => String(e.error?.message ?? "turn failed")).at(-1);
+      const failed = failure(s, "codex", timeout_ms);
+      const error = (failed && turnFailed && !s.timed_out && !s.error ? `codex exited with code ${s.code}: ${turnFailed}` : failed)
         ?? (!started ? "codex printed no thread or turn event, so nothing proves that no tool ran" : null)
         ?? unreadable;
       return {

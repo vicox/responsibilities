@@ -91,17 +91,28 @@ Checked by running it on this machine (Phase 0):
 5. **Failures.** An exceeded budget exits 1 with `is_error: true` and `subtype: "error_max_budget_usd"`; the budget is checked after a turn, so a turn can overspend once. An invalid API key exits 1 with `is_error: true` and `api_error_status: 401`.
 6. **Latency and cost.** See the results below.
 
-### `codex` (codex-cli 0.160.0, not yet verified)
+### `codex` (codex-cli 0.160.0, verified)
 
 ```
 codex exec --skip-git-repo-check --sandbox read-only --ephemeral --ignore-user-config --ignore-rules \
-  -c project_doc_max_bytes=0 -c 'history.persistence="none"' --json --color never [-m <m>] \
+  -c project_doc_max_bytes=0 -c 'history.persistence="none"' \
+  --disable shell_tool --disable unified_exec --disable apps --disable plugins --disable remote_plugin \
+  --disable browser_use --disable browser_use_external --disable in_app_browser --disable computer_use \
+  --disable image_generation --disable multi_agent --disable view_image --disable hooks --disable sleep_tool \
+  --disable skill_search --disable skill_mcp_dependency_install --disable tool_suggest --disable goals \
+  --disable workspace_dependencies \
+  --json --color never [-m <m>] \
   --output-schema <file> --output-last-message <file> -C <empty dir> -      # rules and prompt on stdin
 ```
 
-These flags are the ones `codex exec --help` lists for codex-cli 0.160.0. Their behaviour is **not verified**: in the environment this was built in, every `codex` command needs an approval that was not available, and a nested probe from another Codex session failed in its sandbox before any model call ("failed to initialize in-process app-server client"). The judge's no-tool proof is that the JSONL events carry no item other than `agent_message` or `reasoning`; the answer is read from `--output-last-message`.
+Checked by running it on this machine (Phase 0). Codex has no flag that turns all tools off; the `--disable` list is every feature of this version (`codex features list`) that gives the model a tool.
 
-No flag stops Codex from reading an `AGENTS.md` or `AGENTS.override.md` in its home (`CODEX_HOME`, else `~/.codex`), and its login lives in that home too, so the judge does not swap in an empty one. Instead it refuses to start while either file exists there, before D1, and names the file. `project_doc_max_bytes=0` keeps project documents out; it is documented, but unproved here.
+1. **Structured output.** With `--output-schema`, the answer is the JSON in the `--output-last-message` file (the final `agent_message` carries the same text). The judge schema's nullable fields (`"type": ["string", "null"]`) are accepted. `parse.ts` and the core's schema validate the answer again.
+2. **No tool runs.** `--sandbox read-only` is not enough: with it alone, asked to read a planted `note.txt`, the model ran `/bin/zsh -lc 'cat note.txt'` and returned the file's contents, and an MCP server from the account's apps was started. With the features above disabled, the same request got the answer the prompt allowed for "cannot read files", the events showed no `command_execution`, no MCP server started, and the input fell from 28,410 to 10,968 tokens. The judge's proof is that the JSONL events carry no item other than `agent_message`, `reasoning` or `error` (a warning Codex reports, shown in the report).
+3. **Isolation.** An `AGENTS.md` planted in the working directory named a project marker. Without `project_doc_max_bytes=0`, Codex answered with the marker; with it, that there was none. `--ignore-user-config` skips `config.toml`. No flag keeps out an `AGENTS.md` or `AGENTS.override.md` in Codex's home (`CODEX_HOME`, else `~/.codex`), and the login lives in that home, so the judge does not swap in an empty one: it refuses to start, before D1, while either file exists there. The home on this machine has neither. Codex's own built-in skill list (image generation, OpenAI docs, skill creation and installation) stays in its developer instructions; with no tool, none of those skills can be read or run.
+4. **No session written.** With `--ephemeral`, `codex exec resume <thread id>` of a probe thread failed with "no rollout found". `history.persistence="none"` is set as documented; it was not checked separately.
+5. **Failures.** A failed turn exits 1 with `error` and `turn.failed` events on stdout and nothing on stderr (shown with an unknown model); the judge reports the failed turn's message. A missing login was not tried: it needs another `CODEX_HOME` in the environment, which this environment does not allow without an approval. Codex has no budget flag; the 180-second timeout bounds a call.
+6. **Latency and cost.** See the results below. Codex reports tokens, not cost, and does not name the model in its output; with `--ignore-user-config` the model is the CLI's default.
 
 The tests check both judges against fake `claude` and `codex` executables first on `PATH`: the arguments, stdin, the empty temporary directory, the no-tool proof, timeouts and failures.
 
@@ -119,15 +130,19 @@ Each live run is one row; a criterion is PASS or FAIL as `report.md` gives it. T
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 104 s, $0.28 | `xss-fix-verification` |
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 98 s, $0.28 | `xss-fix-verification`, `reopen-original-on-fix-bypass` |
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 92 s, $0.26 | `verify-fix-before-resolving-at-source`, `xss-fix-at-sink-with-variant-tests`, `release-gate-covers-unverified-resolutions` |
-| — | codex | 0.160.0 | — | not run | | | | | | | | every `codex` command needs an approval that was not available |
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 43 s, not reported | `macro-title-xss-verification` |
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 44 s, not reported | `xss-fix-validation` |
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 49 s, not reported | `macro-title-xss-regression` |
 
-A day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). Whether each Improvement proposes a sensible change is still for a person to judge from the runs' reports.
+With `claude`, a day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). With `codex`, a day took 5–12 seconds; all three runs used the judge with the tool features disabled. Whether each Improvement proposes a sensible change is still for a person to judge from the runs' reports.
 
 What the runs showed beyond the checks:
 
-- The model saw the weak fix before the scan did. In every run it proposed a first Improvement on D3, because PR #88 only strips `<img>` and CI ran no security test, and refined or added Improvements on D4 and D5; on D6 it updated them with the scan as new evidence, or proposed another (reopen the original finding when a scan bypasses its fix). The D6 check therefore accepts an update as well as a new Improvement. The changes it proposed: encode output at the sink instead of filtering tags, a regression test with bypass payloads, no resolving at the source before a security sign-off or retest, and release review for candidates that carry an unchecked security fix.
-- It never proposed reopening F-17. On D5 every run linked the release candidate to the resolved F-17 as evidence, which leaves the day quiet.
-- On D6 every run also asked for `security_review` on DAST-301. The core refused it with `ATTENTION_GATE_NOT_MET`, the rule `unknown` because no Bugcrowd row lists DAST-301, and the report shows the refusal as audit context.
+- `claude` saw the weak fix before the scan did. In every run it proposed a first Improvement on D3, because PR #88 only strips `<img>` and CI ran no security test, and refined or added Improvements on D4 and D5; on D6 it updated them with the scan as new evidence, or proposed another (reopen the original finding when a scan bypasses its fix). The changes it proposed: encode output at the sink instead of filtering tags, a regression test with bypass payloads, no resolving at the source before a security sign-off or retest, and release review for candidates that carry an unchecked security fix.
+- `codex` was terser. Twice it proposed its Improvement only on D6, from the scan; once on D3, updated on D6 with the scan. All three ask for regression tests with executable markup beyond `<img>` (SVG named); two ask for the fix to be checked against the original sink, or by security, before the report is resolved at its source; one asks for escaping or sanitizing for the rendering context.
+- The D6 check therefore accepts an update as well as a new Improvement.
+- No run proposed reopening F-17. On D5 every `claude` run linked the release candidate to the resolved F-17 as evidence; every `codex` run proposed nothing. Both leave the day quiet.
+- On D6 every run of both judges also asked for `security_review` on DAST-301. The core refused it with `ATTENTION_GATE_NOT_MET`, the rule `unknown` because no Bugcrowd row lists DAST-301, and the report shows the refusal as audit context.
 
 ## Out of scope
 

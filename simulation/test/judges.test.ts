@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { claudeJudge } from "../judges/claude.ts";
-import { codexJudge } from "../judges/codex.ts";
+import { codexJudge, TOOL_FEATURES } from "../judges/codex.ts";
 import { JUDGE_SCHEMA } from "../loop.ts";
 import { tempDir } from "./helpers.ts";
 
@@ -31,6 +31,12 @@ process.stdin.on("end", () => {
     require("node:child_process").spawn("sleep", ["30"], { stdio: "inherit" });
     return setTimeout(() => {}, 60000);
   }
+  if (mode === "fail" && cli === "codex") {
+    out({ type: "thread.started", thread_id: "t" });
+    out({ type: "turn.started" });
+    out({ type: "turn.failed", error: { message: "model_not_found" } });
+    process.exit(1);
+  }
   if (mode === "fail") { console.error("Invalid API key"); process.exit(1); }
   if (cli === "claude") {
     if (mode !== "noinit") out({ type: "system", subtype: "init", tools: mode === "tool" ? ["Bash", "StructuredOutput"] : ["StructuredOutput"], mcp_servers: [], model: "fake-model", claude_code_version: "9.9.9", cwd: process.cwd() });
@@ -39,6 +45,7 @@ process.stdin.on("end", () => {
     out({ type: "result", subtype: "success", is_error: false, structured_output: output, total_cost_usd: 0.0123 });
   } else {
     out({ type: "thread.started", thread_id: "t" });
+    out({ type: "item.completed", item: { id: "0", type: "error", message: "a warning" } });
     out({ type: "turn.started" });
     if (mode === "tool") out({ type: "item.completed", item: { id: "1", type: "command_execution", command: "ls" } });
     out({ type: "item.completed", item: { id: "2", type: "agent_message", text: JSON.stringify(output) } });
@@ -124,9 +131,13 @@ test("codex: documented flags, instructions and prompt on stdin, the schema and 
   const work = c.args[c.args.indexOf("-C") + 1]!;
   assert.deepEqual(c.args, [
     "exec", "--skip-git-repo-check", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-    "-c", "project_doc_max_bytes=0", "-c", "history.persistence=\"none\"", "--json", "--color", "never", "-m", "gpt-x",
+    "-c", "project_doc_max_bytes=0", "-c", "history.persistence=\"none\"",
+    ...TOOL_FEATURES.flatMap((feature) => ["--disable", feature]),
+    "--json", "--color", "never", "-m", "gpt-x",
     "--output-schema", schema, "--output-last-message", last, "-C", work, "-",
   ]);
+  assert.ok(["shell_tool", "unified_exec", "apps", "plugins"].every((f) => TOOL_FEATURES.includes(f)), "no shell, no MCP from apps or plugins");
+  assert.match(a.tool_detail!, /item types: \[error, agent_message\]; codex reported: a warning/, "an error item is not a tool");
   assert.ok(c.cwd === work || c.cwd === `/private${work}`, "it runs in the directory -C names");
   assert.equal(c.stdin, "SYSTEM TEXT\n\n---\n\nPROMPT TEXT");
   assert.deepEqual(c.entries, []);
@@ -140,7 +151,7 @@ test("codex: a command execution, a failure and a missing last message give no u
   assert.equal(tool.tool_free, false);
   assert.match(tool.tool_detail!, /command_execution/);
   const fail = await codexJudge({ env: env("fail") }).ask(request);
-  assert.match(fail.error!, /codex exited with code 1/);
+  assert.equal(fail.error, "codex exited with code 1: model_not_found", "the failed turn's message, from stdout");
   const none = await codexJudge({ env: env("nomessage") }).ask(request);
   assert.deepEqual([none.output, none.error], [null, "codex wrote no last message"]);
 });
