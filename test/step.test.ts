@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { command, digest, step, view } from "../src/index.ts";
-import { at, caseOf, closedList, codes, definition, judge, offered, openList, opened, propose, wordsOnly } from "./helpers.ts";
+import { at, attention, caseOf, closedList, codes, definition, improve, judge, openList, opened, propose, wordsOnly } from "./helpers.ts";
 
 test("a proposal with evidence opens a case", () => {
   const r = opened();
@@ -120,97 +120,28 @@ test("title and summary: a missing field keeps the value; the transition carries
   assert.equal("title" in r.transitions[0]!, false);
 });
 
-test("action requests: offered, exact arguments, a reason, once per episode", () => {
-  const o = [openList("open-1", 2, [173])];
-  const notify = { key: "notify", arguments: { channel: "#security", text: "Report 173 needs an owner." }, reason: "Unassigned." };
-  const r = judge(null, o, [propose(173, "open", ["open-1"], {
-    actions: [
-      notify,
-      { key: "page", arguments: {}, reason: "Urgent." },
-      { key: "label", arguments: { name: "triage", urgent: "yes" }, reason: "Mark it." },
-      { key: "label", arguments: { name: "triage" }, reason: "Mark it." },
-    ],
-  })], at(2, 1));
-  const id = caseOf(173);
-  assert.deepEqual(r.action_requests, [{
-    id: digest([id, "notify", 1]), case_id: id, key: "notify", arguments: notify.arguments, reason: "Unassigned.",
-    episode: 1, transition_id: r.transitions[0]!.id,
-  }]);
-  assert.deepEqual(r.rejections.map((x) => [x.ref.key, x.code]), [
-    ["label", "ACTION_ARGUMENTS"], ["label", "ACTION_ARGUMENTS"], ["page", "ACTION_NOT_OFFERED"],
-  ]);
-  assert.deepEqual(r.state!.cases[id]!.requested, [["notify", 1]]);
-
-  // Same key, same episode, other arguments: repeated. A request needs no status change.
-  const again = judge(r.state, o, [propose(173, "open", ["open-1"], {
-    actions: [{ ...notify, arguments: { channel: "#other", text: "Again." } }, { key: "label", arguments: { name: "triage", urgent: true }, reason: " " }],
-  })], at(2, 2));
-  assert.deepEqual(again.rejections.map((x) => [x.ref.key, x.code]), [["label", "ACTION_NO_REASON"], ["notify", "ACTION_REPEATED"]]);
-  const labelled = judge(r.state, o, [propose(173, "open", ["open-1"], {
-    actions: [{ key: "label", arguments: { name: "triage", urgent: true }, reason: "Mark it." }],
-  })], at(2, 2));
-  assert.equal(labelled.action_requests.length, 1);
-  assert.equal(labelled.transitions[0]!.kind, "updated");
-});
-
-test("a key named twice in one proposal is rejected in every entry", () => {
-  const r = judge(null, [openList("open-1", 2, [173])], [propose(173, "open", ["open-1"], {
-    actions: [
-      { key: "notify", arguments: { channel: "#a", text: "x" }, reason: "One." },
-      { key: "notify", arguments: { channel: "#b", text: "y" }, reason: "Two." },
-    ],
-  })], at(2, 1));
-  assert.deepEqual(codes(r), ["ACTION_REPEATED", "ACTION_REPEATED"]);
-  assert.deepEqual(r.action_requests, []);
-});
-
-test("after a reopen, the same action may be requested again", () => {
-  const notify = { key: "notify", arguments: { channel: "#security", text: "Back." }, reason: "Reopened." };
-  const first = judge(null, [openList("open-1", 2, [173])], [propose(173, "open", ["open-1"], { actions: [notify] })], at(2, 1));
-  const resolved = judge(first.state, [openList("open-2", 3, [])], [propose(173, "resolved", ["open-2"], { actions: [notify] })], at(3, 1));
-  assert.deepEqual(codes(resolved), ["ACTION_CASE_NOT_OPEN"]);
-  assert.deepEqual(resolved.state!.cases[caseOf(173)]!.requested, []);
-  const back = judge(resolved.state, [openList("open-3", 4, [173])], [propose(173, "open", ["open-3"], { actions: [notify] })], at(4, 1));
-  assert.deepEqual(back.rejections, []);
-  assert.equal(back.action_requests[0]!.episode, 3);
-  assert.notEqual(back.action_requests[0]!.id, first.action_requests[0]!.id);
-});
-
-test("max_requests keeps the first requests by (case_id, key)", () => {
-  const o = [openList("open-1", 2, [1, 2, 3])];
-  const ask = (report: number) => propose(report, "open", ["open-1"], {
-    actions: [
-      { key: "notify", arguments: { channel: "#s", text: `${report}` }, reason: "New." },
-      { key: "label", arguments: { name: "new", urgent: false }, reason: "New." },
-    ],
-  });
-  const r = judge(null, o, [ask(1), ask(2), ask(3)], at(2, 1), { max: 3 });
-  const order = [1, 2, 3].map((n) => caseOf(n)).sort().flatMap((id) => [[id, "label"], [id, "notify"]]);
-  assert.deepEqual(r.action_requests.map((x) => [x.case_id, x.key]), order.slice(0, 3));
-  assert.deepEqual(r.rejections.map((x) => [x.ref.case_id, x.ref.key, x.code]), order.slice(3).map((p) => [...p, "ACTION_OVER_LIMIT"]));
-  assert.equal(r.transitions.length, 3, "an over-limit request does not undo the case");
-  assert.equal(judge(null, o, [ask(1)], at(2, 1), { max: 0 }).action_requests.length, 0);
-});
-
-test("a basis from other inputs rejects every proposal and changes nothing", () => {
+test("a basis from other inputs rejects every proposal and Improvement and changes nothing", () => {
   const first = opened();
-  const o = [openList("open-2", 3, [])];
-  const proposals = [propose(173, "resolved", ["open-2"]), propose(174, "open", ["open-2"])];
-  const basis = view(definition, first.state, o, offered, 5, at(3, 1)).basis;
-  const evaluation = { basis, evaluator: "test", proposals };
+  const o = [openList("open-2", 3, [174])];
+  const proposals = [propose(173, "resolved", ["open-2"]), propose(174, "open", ["open-2"], { attentions: [attention("needs_owner", "open")] })];
+  const improvements = [improve("assign-on-intake", ["open-2"])];
+  const basis = view(definition, first.state, o, at(3, 1)).basis;
+  const evaluation = { basis, evaluator: "test", proposals, improvements };
+  const reordered = { ...definition, attention_types: [...definition.attention_types!].reverse() };
+  assert.equal(step(reordered, first.state, o, evaluation, at(3, 1)).rejections.length, 0, "attention_types order is not an input");
   const steps = [
-    [first.state, () => step(definition, first.state, o, offered, 5, evaluation, at(3, 2))], // another now
-    [first.state, () => step(definition, first.state, o, offered, 4, evaluation, at(3, 1))], // another max_requests
-    [first.state, () => step(definition, first.state, o, offered.slice(1), 5, evaluation, at(3, 1))], // other offered actions
-    [first.state, () => step(definition, first.state, [...o, openList("open-9", 3, [])], offered, 5, evaluation, at(3, 1))], // more observations
-    [first.state, () => step(wordsOnly, first.state, o, offered, 5, evaluation, at(3, 1))], // another definition
-    [null, () => step(definition, null, o, offered, 5, evaluation, at(3, 1))], // another state
+    [first.state, () => step(definition, first.state, o, evaluation, at(3, 2))], // another now
+    [first.state, () => step(definition, first.state, [...o, openList("open-9", 3, [])], evaluation, at(3, 1))], // more observations
+    [first.state, () => step(wordsOnly, first.state, o, evaluation, at(3, 1))], // another definition
+    [first.state, () => step({ ...definition, attention_types: [] }, first.state, o, evaluation, at(3, 1))], // other attention types
+    [null, () => step(definition, null, o, evaluation, at(3, 1))], // another state
   ] as const;
   for (const [state, run] of steps) {
     const r = run();
-    assert.deepEqual(codes(r), ["BASIS_MISMATCH", "BASIS_MISMATCH"]);
+    assert.deepEqual(codes(r), ["BASIS_MISMATCH", "BASIS_MISMATCH", "BASIS_MISMATCH"]);
+    assert.deepEqual(r.rejections.map((x) => x.ref.part), ["proposal", "proposal", "improvement"]);
     assert.equal(r.rejections[0]!.detail.received, basis);
-    assert.deepEqual(r.transitions, []);
+    assert.deepEqual([r.transitions, r.attention_events, r.deliveries, r.improvement_events], [[], [], [], []]);
     assert.deepEqual(r.state, state, "unchanged, now included");
     assert.equal(r.state_digest, digest(state));
   }

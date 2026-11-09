@@ -43,6 +43,16 @@ export interface Criterion {
   any_of?: { rules: Rule[] }[];
 }
 
+/** A kind of Attention a Case can need: a person or team should look at it. */
+export interface AttentionType {
+  key: string;
+  description: string;
+  /** Rules that must all be `met` for the Subject before an Attention of this type opens or reopens. */
+  when?: Rule[];
+  /** Where an opening or reopening is delivered; without it the Attention is only recorded. */
+  delivery?: { route: string };
+}
+
 export interface Definition {
   id: string;
   version: number;
@@ -53,6 +63,7 @@ export interface Definition {
   include: string[];
   closing: Criterion[];
   success: Criterion[];
+  attention_types?: AttentionType[];
 }
 
 export interface Observation {
@@ -65,16 +76,12 @@ export interface Observation {
   complete: boolean;
 }
 
-export type ParamType = "string" | "int" | "bool";
+export type AttentionIntent = "open" | "keep" | "close";
 
-export interface OfferedAction {
-  key: string;
-  params: Record<string, ParamType>;
-}
-
-export interface ProposedAction {
-  key: string;
-  arguments: Record<string, Scalar>;
+export interface ProposedAttention {
+  /** An `attention_types` key. */
+  type: string;
+  intent: AttentionIntent;
   reason: string;
 }
 
@@ -84,7 +91,18 @@ export interface Proposal {
   cites: string[];
   title?: string;
   summary?: string;
-  actions?: ProposedAction[];
+  attentions?: ProposedAttention[];
+}
+
+/** A proposed change to how the work is done, independent of any one Case. */
+export interface ProposedImprovement {
+  /** Names the Improvement; the same key again updates it. */
+  key: string;
+  title: string;
+  change: string;
+  rationale: string;
+  /** Observation ids; at least one. */
+  cites: string[];
 }
 
 export interface Evaluation {
@@ -92,6 +110,7 @@ export interface Evaluation {
   basis: Hash;
   evaluator: string;
   proposals: Proposal[];
+  improvements?: ProposedImprovement[];
 }
 
 export interface Command {
@@ -118,8 +137,31 @@ export interface Case {
   evidence: Record<string, Hash>;
   first_observed: Time;
   last_observed: Time;
-  /** `[key, episode]` of the requests of the current episode. */
-  requested: [string, number][];
+  /** Attention type -> its latest activation on this Case. */
+  attentions: Record<string, Attention>;
+}
+
+export interface Attention {
+  status: "open" | "closed";
+  /** Openings so far, the first included; a reopening is a new activation. */
+  activation: number;
+  opened_at: Time;
+  closed_at: Time | null;
+}
+
+export interface Improvement {
+  key: string;
+  title: string;
+  change: string;
+  rationale: string;
+  /** Observation id -> digest of the observation when it was cited. */
+  evidence: Record<string, Hash>;
+  proposed_at: Time;
+  updated_at: Time;
+  /** Events so far; numbers the next event id. */
+  seq: number;
+  /** Definition version of the latest event. */
+  version: number;
 }
 
 export interface State {
@@ -128,17 +170,21 @@ export interface State {
   identity_digest: Hash;
   now: Time;
   cases: Record<Hash, Case>;
+  /** `H({definition_id, key})` -> the Improvement. */
+  improvements: Record<Hash, Improvement>;
 }
 
 export interface View {
   spec: string;
   basis: Hash;
   observations: Observation[];
-  open_cases: { case_id: Hash; subject: Subject; status: Status; episode: number }[];
+  /** Every Case, open or not, by case_id. */
+  cases: { case_id: Hash; subject: Subject; status: Status; episode: number; title: string | null; attentions: string[] }[];
+  /** The declared types; whether a check gates an opening and whether one is delivered, never the rules. */
+  attention_types: { key: string; description: string; checked: boolean; routed: boolean }[];
+  improvements: { key: string; title: string; change: string }[];
   closing: string[];
   expectations?: string;
-  offered_actions: OfferedAction[];
-  max_requests: number;
 }
 
 export interface RuleTrace {
@@ -178,6 +224,52 @@ export interface Transition {
   at: Time;
 }
 
+export interface AttentionEvent {
+  /** `H([case_id, type, activation, event])` */
+  id: Hash;
+  case_id: Hash;
+  type: string;
+  event: "opened" | "reopened" | "closed";
+  activation: number;
+  actor: string;
+  reason: string;
+  /** The ref of the proposal that asked for it. */
+  proposal: Hash;
+  /** The `when` check that allowed an opening or reopening. */
+  gate_check?: Check;
+  version: number;
+  at: Time;
+}
+
+/** One opening or reopening of a routed Attention type: what the host delivers. */
+export interface Delivery {
+  /** `H([case_id, type, activation])`: the dedupe key, stable across replays. */
+  id: Hash;
+  case_id: Hash;
+  subject: Subject;
+  type: string;
+  activation: number;
+  route: string;
+  reason: string;
+  event_id: Hash;
+}
+
+export interface ImprovementEvent {
+  /** `H([improvement_id, seq])` */
+  id: Hash;
+  improvement_id: Hash;
+  key: string;
+  kind: "proposed" | "updated";
+  actor: string;
+  added_evidence: { obs_id: string; digest: Hash }[];
+  /** Present only when changed by this event. */
+  title?: string;
+  change?: string;
+  rationale?: string;
+  version: number;
+  at: Time;
+}
+
 export type RejectionCode =
   | "BASIS_MISMATCH"
   | "UNKNOWN_EVIDENCE"
@@ -188,16 +280,23 @@ export type RejectionCode =
   | "CLOSING_NOT_MET"
   | "REOPEN_WHILE_CLOSING_MET"
   | "STATUS_UNCHANGED_NO_NEW_EVIDENCE"
-  | "ACTION_NOT_OFFERED"
-  | "ACTION_ARGUMENTS"
-  | "ACTION_NO_REASON"
-  | "ACTION_CASE_NOT_OPEN"
-  | "ACTION_REPEATED"
-  | "ACTION_OVER_LIMIT";
+  | "ATTENTION_REPEATED"
+  | "ATTENTION_NO_REASON"
+  | "ATTENTION_NOT_DECLARED"
+  | "ATTENTION_CASE_NOT_OPEN"
+  | "ATTENTION_GATE_NOT_MET"
+  | "IMPROVEMENT_CONFLICT"
+  | "IMPROVEMENT_INCOMPLETE";
 
 export interface Rejection {
-  /** `proposal` is `H(proposal)`. `part` says what was not taken: all of it, its status and text, or one action. */
-  ref: { proposal: Hash; case_id?: Hash; part: "proposal" | "status" | "action"; key?: string };
+  /**
+   * `proposal` is `H(proposal)`, `improvement` is `H(improvement)`. `part` says what was not
+   * taken: a whole proposal, its status and text, one Attention entry, or one Improvement.
+   * `key` is the Attention type or the Improvement key.
+   */
+  ref:
+    | { proposal: Hash; case_id?: Hash; part: "proposal" | "status" | "attention"; key?: string }
+    | { improvement: Hash; part: "improvement"; key: string };
   code: RejectionCode;
   detail: {
     message: string;
@@ -205,28 +304,20 @@ export interface Rejection {
     received?: Hash;
     unknown?: string[];
     closing_check?: Check;
+    gate_check?: Check;
     proposed_title?: string;
     proposed_summary?: string;
   };
-}
-
-export interface ActionRequest {
-  /** `H([case_id, key, episode])`: the dedupe key, stable across replays. */
-  id: Hash;
-  case_id: Hash;
-  key: string;
-  arguments: Record<string, Scalar>;
-  reason: string;
-  episode: number;
-  transition_id: Hash;
 }
 
 export interface StepResult {
   spec: string;
   state: State | null;
   transitions: Transition[];
+  attention_events: AttentionEvent[];
+  deliveries: Delivery[];
+  improvement_events: ImprovementEvent[];
   rejections: Rejection[];
-  action_requests: ActionRequest[];
   state_digest: Hash;
 }
 

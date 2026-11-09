@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assess, canonical, command, InputError, step, view } from "../src/index.ts";
 import type { Definition, Observation, Proposal, State } from "../src/index.ts";
-import { at, caseOf, definition, judge, offered, openList, opened, propose } from "./helpers.ts";
+import { at, attention, caseOf, definition, improve, improvementOf, judge, openList, opened, propose } from "./helpers.ts";
 
 const refuses = (run: () => unknown, pattern: RegExp) => assert.throws(run, (e: unknown) => e instanceof InputError && pattern.test(e.message));
 const o1 = openList("open-1", 2, [173]);
 const look = (d: unknown, state: unknown = null, observations: unknown = [o1], now: unknown = at(2, 1)) =>
-  view(d as Definition, state as State, observations as Observation[], offered, 5, now as string);
+  view(d as Definition, state as State, observations as Observation[], now as string);
 const proposeOne = (p: unknown) => judge(null, [o1], [p as Proposal], at(2, 1));
 
 test("strings must be NFC and well-formed", () => {
@@ -46,7 +46,6 @@ test("a counter that cannot grow refuses the call instead of overflowing", () =>
 test("numbers: finite everywhere, integers in range outside rows, fractions only in rows", () => {
   refuses(() => look(definition, null, [{ ...o1, rows: [{ x: Number.NaN }] }]), /not a finite number/);
   assert.ok(look(definition, null, [{ ...o1, rows: [{ report: 173, score: 0.25 }] }]));
-  refuses(() => view(definition, null, [o1], offered, 2 ** 53, at(2, 1)), /max_requests/);
   refuses(() => look({ ...definition, version: 1.5 }), /definition\.version must be an integer/);
 });
 
@@ -57,7 +56,9 @@ test("the state is bound to the definition's id and identity, not its version", 
   assert.ok(look({ ...definition, version: 2, accountable: "team:other" }, state));
   const forged = { ...state!, cases: { [caseOf(999)]: state!.cases[caseOf(173)]! } };
   refuses(() => look(definition, forged), /is not the id of its subject/);
-  refuses(() => look(definition, { ...state!, spec: "responsibility-core/1" }), /state\.spec/);
+  refuses(() => look(definition, { ...state!, spec: "responsibility-core/0" }), /state\.spec/);
+  const { attentions: _, ...v0 } = state!.cases[caseOf(173)]!;
+  refuses(() => look(definition, { ...state!, cases: { [caseOf(173)]: { ...v0, requested: [] } } }), /attentions is required/);
 });
 
 test("time is monotone and observations are not from the future", () => {
@@ -83,13 +84,26 @@ test("definitions: rules name subject keys, success needs rules, one absent rout
   refuses(() => look({ ...definition, include: ["a", "a"] }), /must not repeat/);
 });
 
-test("proposals, offered actions and commands are checked against the schema", () => {
+test("attention types: unique keys, when rules name subject keys, a route is text", () => {
+  const types = definition.attention_types!;
+  refuses(() => look({ ...definition, attention_types: [...types, { ...types[1]!, description: "Again." }] }), /review occurs twice/);
+  refuses(() => look({ ...definition, attention_types: [{ ...types[0]!, when: [{ kind: "open_reports", match: { id: "report_id" } }] }] }), /attention_types\[0\]\.when: match\.id names report_id/);
+  refuses(() => look({ ...definition, attention_types: [{ ...types[0]!, when: [] }] }), /when must have at least 1 items/);
+  refuses(() => look({ ...definition, attention_types: [{ ...types[1]!, delivery: { route: "" } }] }), /route must not be empty/);
+  refuses(() => look({ ...definition, attention_types: [{ ...types[1]!, notify: true }] }), /notify is not allowed/);
+});
+
+test("proposals, attentions, improvements and commands are checked against the schema", () => {
   refuses(() => proposeOne(propose(173, "open", ["open-1"], { title: "" })), /title must not be empty/);
   refuses(() => proposeOne({ ...propose(173, "open", ["open-1"]), confidence: 0.9 }), /confidence is not allowed/);
   refuses(() => proposeOne(propose(173, "dismissed" as "open", ["open-1"])), /status must be one of "open", "resolved"/);
   refuses(() => proposeOne(propose(173, "open", ["open-1", "open-1"])), /cites must not repeat/);
-  refuses(() => view(definition, null, [o1], [...offered, offered[0]!], 5, at(2, 1)), /notify occurs twice/);
-  refuses(() => view(definition, null, [o1], [{ key: "x", params: { a: "float" as "int" } }], 5, at(2, 1)), /params\.a/);
+  refuses(() => proposeOne(propose(173, "open", ["open-1"], { attentions: [attention("review", "start" as "open")] })), /intent must be one of/);
+  refuses(() => proposeOne(propose(173, "open", ["open-1"], { attentions: [{ type: "review", intent: "open" } as never] })), /reason is required/);
+  refuses(() => proposeOne({ ...propose(173, "open", ["open-1"]), actions: [] }), /actions is not allowed/);
+  refuses(() => judge(null, [o1], [], at(2, 1), { improvements: [improve("", ["open-1"])] }), /key must not be empty/);
+  refuses(() => judge(null, [o1], [], at(2, 1), { improvements: [improve("k", ["open-1", "open-1"])] }), /cites must not repeat/);
+  refuses(() => judge(null, [o1], [], at(2, 1), { improvements: [{ ...improve("k", ["open-1"]), case_id: caseOf(173) } as never] }), /case_id is not allowed/);
 
   const { state } = opened();
   const id = caseOf(173);
@@ -107,16 +121,31 @@ test("inputs are never mutated, and outputs share nothing with them", () => {
   };
   const { state } = opened();
   const inputs = freeze({
+    definition,
     state,
     observations: [openList("open-2", 3, [173]), o1],
-    proposals: [propose(173, "open", ["open-2"], { summary: "Still open.", actions: [{ key: "notify", arguments: { channel: "#s", text: "t" }, reason: "r" }] })],
+    proposals: [propose(173, "open", ["open-2"], { summary: "Still open.", attentions: [attention("needs_owner", "open"), attention("review", "open")] })],
+    improvements: [improve("assign-on-intake", ["open-2", "open-1"])],
   });
   const before = canonical(inputs);
-  const v = view(definition, inputs.state, inputs.observations, offered, 5, at(3, 1));
-  const r = step(definition, inputs.state, inputs.observations, offered, 5, { basis: v.basis, evaluator: "test", proposals: inputs.proposals }, at(3, 1));
+  const v = view(inputs.definition, inputs.state, inputs.observations, at(3, 1));
+  const r = step(inputs.definition, inputs.state, inputs.observations,
+    { basis: v.basis, evaluator: "test", proposals: inputs.proposals, improvements: inputs.improvements }, at(3, 1));
   assert.equal(canonical(inputs), before);
-  r.action_requests[0]!.arguments.channel = "#changed";
-  assert.equal(inputs.proposals[0]!.actions![0]!.arguments.channel, "#s");
+  assert.equal(r.deliveries.length, 1);
+  r.deliveries[0]!.subject.keys.report = 999;
+  assert.equal(inputs.proposals[0]!.subject.keys.report, 173);
+  assert.equal(r.state!.cases[caseOf(173)]!.subject.keys.report, 173, "a delivery shares nothing with the state");
+});
+
+test("the state is checked: improvement ids, and observations cited by an Improvement are immutable", () => {
+  const r = judge(opened().state, [o1], [], at(2, 2), { improvements: [improve("assign-on-intake", ["open-1"])] });
+  const id = improvementOf("assign-on-intake");
+  const forged = { ...r.state!, improvements: { [improvementOf("other")]: r.state!.improvements[id]! } };
+  refuses(() => look(definition, forged, [o1], at(2, 3)), /state\.improvements\..+ is not the id of its key/);
+  const unlinked = { ...r.state!, cases: {} };
+  refuses(() => look(definition, unlinked, [{ ...o1, rows: [] }], at(2, 3)), /open-1 is not the one linked to improvement/);
+  refuses(() => look(definition, { ...r.state!, improvements: { [id]: { ...r.state!.improvements[id]!, evidence: {} } } }, [o1], at(2, 3)), /evidence must have at least 1 entries/);
 });
 
 test("ids that are Object.prototype names are plain data", () => {

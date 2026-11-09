@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "A Responsibility core as pure functions: definition, observations, state and an external judgment in; state, transitions, rejections and action requests out.",
+  "description": "A Responsibility core as pure functions: definition, observations, state and an external judgment in; state, transitions, Attention and Improvement events, deliveries and rejections out.",
   "type": "module",
   "exports": {
     ".": {
@@ -18,7 +18,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "tsc --noEmit && node --test test/*.test.ts",
-    "fixtures": "UPDATE_FIXTURES=1 node --test test/readme.test.ts test/actions.test.ts"
+    "fixtures": "UPDATE_FIXTURES=1 node --test test/readme.test.ts test/attention.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

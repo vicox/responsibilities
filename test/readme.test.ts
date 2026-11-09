@@ -29,8 +29,11 @@ test("the README example runs, does what it says, and is the fixture", async () 
 
   assert.deepEqual(r.rejections, []);
   assert.deepEqual(r.transitions.map((t) => [t.case_id, t.kind, t.to, t.actor]), [[caseId, "opened", "open", "judge:llm"]]);
-  assert.deepEqual(r.action_requests.map((x) => [x.case_id, x.key, x.episode]), [[caseId, "remind", 1]]);
-  assert.deepEqual(r.action_requests[0]!.arguments, { channel: "#support", text: "ACME waits for an answer to T-1042." });
+  assert.deepEqual(r.attention_events.map((e) => [e.case_id, e.type, e.event, e.activation, e.gate_check?.result]), [[caseId, "needs_answer", "opened", 1, "met"]]);
+  assert.deepEqual(r.deliveries.map((x) => [x.id, x.case_id, x.type, x.activation, x.route, x.reason, x.event_id]), [[
+    digest([caseId, "needs_answer", 1]), caseId, "needs_answer", 1, "#support", "ACME waits for an answer to T-1042.", r.attention_events[0]!.id,
+  ]]);
+  assert.deepEqual(r.improvement_events, []);
   assert.deepEqual(c.transitions.map((t) => [t.case_id, t.kind, t.from, t.to, t.actor]), [[caseId, "status_changed", "open", "resolved", "person:mia"]]);
   assert.equal(c.state!.cases[caseId]!.status, "resolved");
   assert.equal(a.result, "not_met");

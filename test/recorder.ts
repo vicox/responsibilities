@@ -13,15 +13,15 @@ export interface Call {
 
 export const calls: Call[] = [];
 
-export const view: typeof core.view = (definition, state, observations, offered_actions, max_requests, now) => {
-  const result = core.view(definition, state, observations, offered_actions, max_requests, now);
-  calls.push({ fn: "view", state, args: { definition, observations, offered_actions, max_requests, now }, result });
+export const view: typeof core.view = (definition, state, observations, now) => {
+  const result = core.view(definition, state, observations, now);
+  calls.push({ fn: "view", state, args: { definition, observations, now }, result });
   return result;
 };
 
-export const step: typeof core.step = (definition, state, observations, offered_actions, max_requests, evaluation, now) => {
-  const result = core.step(definition, state, observations, offered_actions, max_requests, evaluation, now);
-  calls.push({ fn: "step", state, args: { definition, observations, offered_actions, max_requests, evaluation, now }, result });
+export const step: typeof core.step = (definition, state, observations, evaluation, now) => {
+  const result = core.step(definition, state, observations, evaluation, now);
+  calls.push({ fn: "step", state, args: { definition, observations, evaluation, now }, result });
   return result;
 };
 

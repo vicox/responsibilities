@@ -67,7 +67,7 @@ test("routes are an OR, rules and criteria an AND, all three-valued", () => {
 });
 
 test("no success criteria: unknown", () => {
-  assert.deepEqual(read([], fixed([])), { spec: "responsibility-core/0", case_id: id, result: "unknown", criteria: [] });
+  assert.deepEqual(read([], fixed([])), { spec: "responsibility-core/1", case_id: id, result: "unknown", criteria: [] });
 });
 
 test("closing is not success", () => {

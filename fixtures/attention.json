@@ -1,5 +1,5 @@
 {
-  "spec": "responsibility-core/0",
+  "spec": "responsibility-core/1",
   "calls": [
     {
       "fn": "view",
@@ -52,6 +52,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -76,26 +100,9 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "now": "2026-11-02T09:01:00.000Z"
       },
-      "result_digest": "067620c384321bff239e7634d3da4b4861d2d96bbc7ad64a59dc821da2e647fe"
+      "result_digest": "51d953dcc1eec8cd7714e67b6fa3a6475005fca8e9c1034202b126b36905ec0c"
     },
     {
       "fn": "step",
@@ -148,6 +155,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -172,25 +203,8 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "evaluation": {
-          "basis": "73e6523cf7bbcadd6b555e2195f246c849d284cacc3fc7c62b91ab1c69bd44f1",
+          "basis": "e90a595a143202e909691eb5c779a7af6a3d09ca824b495241cc156b7cafda32",
           "evaluator": "llm-triage",
           "proposals": [
             {
@@ -204,13 +218,10 @@
               "cites": [
                 "open-1"
               ],
-              "actions": [
+              "attentions": [
                 {
-                  "key": "notify",
-                  "arguments": {
-                    "channel": "#security",
-                    "text": "Report 173 needs an owner."
-                  },
+                  "type": "needs_owner",
+                  "intent": "open",
                   "reason": "Nobody owns report 173."
                 }
               ]
@@ -219,8 +230,8 @@
         },
         "now": "2026-11-02T09:01:00.000Z"
       },
-      "state_digest": "c93c48010eba0bd8e2b1d5c16fd568b6b5bce8b6f427b888ecbd3e412dd54222",
-      "result_digest": "a934555c79f01434cf2315aa4b967029af46ffd079f4475090117ba1116a1942"
+      "state_digest": "5427c51a997f831a9a55240e72d86eacba3a688165c1e26e18275fd602a2a2f2",
+      "result_digest": "4ba881c50e96c3dd0450123b52d10aaddccb9ceb9eb936f19c325a6db448384a"
     },
     {
       "fn": "view",
@@ -273,6 +284,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -291,32 +326,15 @@
             "rows": [
               {
                 "report": 173,
-                "state": "new"
+                "state": "assigned"
               }
             ],
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "now": "2026-11-03T09:01:00.000Z"
       },
-      "result_digest": "b01f189930af2817b7ed04f4bc580082386afc029f652f54abb34536ca1d4019"
+      "result_digest": "1e347dcc0c7dcb5d3186bf9d46a9aa64880aac9a8de3e794ef3dd002fae05a98"
     },
     {
       "fn": "step",
@@ -369,6 +387,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -387,31 +429,14 @@
             "rows": [
               {
                 "report": 173,
-                "state": "new"
+                "state": "assigned"
               }
             ],
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "evaluation": {
-          "basis": "1ab75d2cd3303ee138328157cabb4315ef8344cc0be33b5b59860392bd49501e",
+          "basis": "e761f3fe78a3b753129f16f0dfe4fb5c0d9d17e7c1af27220b07f2aa78560c47",
           "evaluator": "llm-triage",
           "proposals": [
             {
@@ -425,14 +450,11 @@
               "cites": [
                 "open-2"
               ],
-              "actions": [
+              "attentions": [
                 {
-                  "key": "notify",
-                  "arguments": {
-                    "channel": "#security",
-                    "text": "Report 173 still needs an owner."
-                  },
-                  "reason": "Nobody owns report 173."
+                  "type": "needs_owner",
+                  "intent": "close",
+                  "reason": "Ada owns it now."
                 }
               ]
             }
@@ -440,8 +462,8 @@
         },
         "now": "2026-11-03T09:01:00.000Z"
       },
-      "state_digest": "e374aee861a236a91080b68491c4b31bada063a2eaa3f59b583b816d7de82f86",
-      "result_digest": "48fef6536311751d563db952a02956c7e8e0f886b813ad6684244dddca1daacb"
+      "state_digest": "b1fc40c801c86c5ba7429332e429542674f378cf95e95e48b7e2ac492fc7d12f",
+      "result_digest": "73751f3c26b60154a556a164d6a914dd17f8c927309ba2bf1bce07b4bc1e3890"
     },
     {
       "fn": "view",
@@ -494,6 +516,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -506,26 +552,9 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "now": "2026-11-04T09:01:00.000Z"
       },
-      "result_digest": "021682503f46fb1f49dc4e651726dde57333de9e6904fc4fb777161e908c8aee"
+      "result_digest": "e32890010637bf92322b8a3bff0aef00d6e82732e377456e8c064c3d92178288"
     },
     {
       "fn": "step",
@@ -578,6 +607,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -590,25 +643,8 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "evaluation": {
-          "basis": "74ff2f4beaf021c8b96dbe35c6bc0bdd4b3299577af151bd07a08c8798c898cb",
+          "basis": "b0a4a810bf781282ba0c3223f0b2a593f780ea107a6bca7be9674a6e6f933688",
           "evaluator": "llm-triage",
           "proposals": [
             {
@@ -627,8 +663,8 @@
         },
         "now": "2026-11-04T09:01:00.000Z"
       },
-      "state_digest": "0412a663f23bf3e39b31e34b5b33dd2a04d92ad606e81b6c2eb9cf7dda1f9b8c",
-      "result_digest": "a894f867bc143afbaebd39199ef4183401355845ccc8022bd44b62939e2c4389"
+      "state_digest": "4efeda78c931d0cadcb2866f3ddcb852b4d921d65f4ace19a08dea46e9d31ee3",
+      "result_digest": "4d923d6e6406570d0d32f057674a01ba1bff5cf2281199d3181569c836b0a96c"
     },
     {
       "fn": "view",
@@ -681,6 +717,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -705,26 +765,9 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "now": "2026-11-05T09:01:00.000Z"
       },
-      "result_digest": "9f1e356ae4843a1f53c28adfcbe1a940b8e0ed8eea381b57e2217d597ae9b079"
+      "result_digest": "470fc5e7bdbdc4b37a298a2253566a5b0dd26bc8f0989ce71752f8ce6d35e202"
     },
     {
       "fn": "step",
@@ -777,6 +820,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "observations": [
@@ -801,25 +868,8 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "notify",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          },
-          {
-            "key": "label",
-            "params": {
-              "name": "string",
-              "urgent": "bool"
-            }
-          }
-        ],
-        "max_requests": 1,
         "evaluation": {
-          "basis": "1e135005c17323b1eb741341caca7a2563f115ffeebcba6f999ddf98d74da82c",
+          "basis": "77f8efceaf2f624cf42ec5ac01a800656011bb246e3731ef9675f16b20407ca3",
           "evaluator": "llm-triage",
           "proposals": [
             {
@@ -833,14 +883,11 @@
               "cites": [
                 "open-4"
               ],
-              "actions": [
+              "attentions": [
                 {
-                  "key": "notify",
-                  "arguments": {
-                    "channel": "#security",
-                    "text": "Report 173 is open again."
-                  },
-                  "reason": "Nobody owns report 173."
+                  "type": "needs_owner",
+                  "intent": "open",
+                  "reason": "Back without an owner."
                 }
               ]
             }
@@ -848,8 +895,8 @@
         },
         "now": "2026-11-05T09:01:00.000Z"
       },
-      "state_digest": "634d35805540d4b3f9dd16132aa81abe14dc5067229e57c3362fdaf8f1ddd0b0",
-      "result_digest": "aac467b12c7b4944f3d0d3312e1c8a7e35224c4ff5008614cb96896839156307"
+      "state_digest": "f2a8821d931d96b7aeeb667232e8af07cf0a01992c26515b25f7f157d13e2deb",
+      "result_digest": "abd50bc46c0944038af518eaa3e79f2a23c9ee361e008028ec7f8bb405bcd800"
     },
     {
       "fn": "command",
@@ -902,6 +949,30 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_owner",
+              "description": "Nobody owns the report yet.",
+              "when": [
+                {
+                  "kind": "open_reports",
+                  "match": {
+                    "report": "report"
+                  },
+                  "where": {
+                    "state": "new"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "security-oncall"
+              }
+            },
+            {
+              "key": "review",
+              "description": "Someone should read the report."
+            }
           ]
         },
         "command": {
@@ -912,8 +983,8 @@
         },
         "now": "2026-11-05T09:02:00.000Z"
       },
-      "state_digest": "e11dcc1a04c354831cda26737bf2bb27d2f4f2a43bbb7f51308426f69d4ad0b6",
-      "result_digest": "98513e89439d5181279611505ac196ef3b722854ab2a1b6954c9a8e3df6d3941"
+      "state_digest": "e125eaeb2ee3444b393dd7dc41ee08ad1c279adc50e146ff7a7ab77ec63a901c",
+      "result_digest": "51092c94cb2c68d20344a86557474236e7117338ecb83670b5e1ffa431c40956"
     }
   ]
 }
