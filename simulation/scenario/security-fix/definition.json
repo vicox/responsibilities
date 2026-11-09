@@ -1,0 +1,35 @@
+{
+  "id": "security-fixes-ship",
+  "version": 1,
+  "identity": { "subject_type": "finding", "subject_keys": ["app", "finding_id"] },
+  "accountable": "team:security",
+  "expectations": "Every security finding in our apps is triaged promptly and fixed before it reaches customers.",
+  "include": ["bugcrowd_findings", "tickets", "pull_requests", "ci_runs", "release_candidates", "prerelease_scan"],
+  "closing": [
+    {
+      "description": "The report is resolved at its source.",
+      "any_of": [
+        { "rules": [{ "kind": "bugcrowd_findings", "match": { "app": "app", "finding_id": "finding_id" }, "where": { "state": "resolved" } }] },
+        { "rules": [{ "kind": "prerelease_scan", "match": { "app": "app", "finding_id": "finding_id" }, "where": { "state": "fixed" } }] }
+      ]
+    }
+  ],
+  "success": [],
+  "attention_types": [
+    {
+      "key": "security_review",
+      "description": "A newly reported finding needs triage by the security on-call.",
+      "when": [{ "kind": "bugcrowd_findings", "match": { "app": "app", "finding_id": "finding_id" }, "where": { "state": "triaging" } }],
+      "delivery": { "route": "security-oncall" }
+    },
+    {
+      "key": "release_review",
+      "description": "A release candidate is waiting to ship while a finding against the app is open; someone must decide whether it may ship.",
+      "when": [
+        { "kind": "release_candidates", "match": { "app": "app" }, "where": { "status": "awaiting_release" } },
+        { "kind": "prerelease_scan", "match": { "app": "app", "finding_id": "finding_id" }, "where": { "state": "open" } }
+      ],
+      "delivery": { "route": "release-review" }
+    }
+  ]
+}

@@ -30,9 +30,9 @@ export function replay(fixture: Fixture): { state: State | null; result: unknown
   return fixture.calls.map(({ fn, args: a }) => {
     const before = state;
     let result: unknown;
-    if (fn === "view") result = view(a.definition, state, a.observations, a.offered_actions, a.max_requests, a.now);
+    if (fn === "view") result = view(a.definition, state, a.observations, a.now);
     if (fn === "assess") result = assess(a.definition, state, a.case_id, a.observations, a.now);
-    if (fn === "step") state = (result = step(a.definition, state, a.observations, a.offered_actions, a.max_requests, a.evaluation, a.now)).state;
+    if (fn === "step") state = (result = step(a.definition, state, a.observations, a.evaluation, a.now)).state;
     if (fn === "command") state = (result = command(a.definition, state, a.command, a.now)).state;
     return { state: before, result };
   });

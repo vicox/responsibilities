@@ -1,5 +1,5 @@
 {
-  "spec": "responsibility-core/0",
+  "spec": "responsibility-core/1",
   "calls": [
     {
       "fn": "view",
@@ -19,7 +19,24 @@
             "waiting_for_us"
           ],
           "closing": [],
-          "success": []
+          "success": [],
+          "attention_types": [
+            {
+              "key": "needs_answer",
+              "description": "A customer waits for a first answer.",
+              "when": [
+                {
+                  "kind": "waiting_for_us",
+                  "match": {
+                    "inquiry": "inquiry"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "#support"
+              }
+            }
+          ]
         },
         "observations": [
           {
@@ -43,19 +60,9 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "remind",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          }
-        ],
-        "max_requests": 1,
         "now": "2026-11-02T09:01:00.000Z"
       },
-      "result_digest": "300d577369685a94099a687fd1c91e914ec31d9fd9c157b627ab652061192449"
+      "result_digest": "9b5aa11469f1e725e75e5da2ec0b83742886b9a8f7694e2f836a0ebf1fe51b9e"
     },
     {
       "fn": "step",
@@ -75,7 +82,24 @@
             "waiting_for_us"
           ],
           "closing": [],
-          "success": []
+          "success": [],
+          "attention_types": [
+            {
+              "key": "needs_answer",
+              "description": "A customer waits for a first answer.",
+              "when": [
+                {
+                  "kind": "waiting_for_us",
+                  "match": {
+                    "inquiry": "inquiry"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "#support"
+              }
+            }
+          ]
         },
         "observations": [
           {
@@ -99,18 +123,8 @@
             "complete": true
           }
         ],
-        "offered_actions": [
-          {
-            "key": "remind",
-            "params": {
-              "channel": "string",
-              "text": "string"
-            }
-          }
-        ],
-        "max_requests": 1,
         "evaluation": {
-          "basis": "49416a58d87f5c5d772ce25534c154c14d48290616b7caefc4cb56e1e6bfecc0",
+          "basis": "33fadf100642c966f429dfc8b349a9134fa0d99409e8b1d3b21a203159ea2c28",
           "evaluator": "llm",
           "proposals": [
             {
@@ -124,14 +138,11 @@
               "cites": [
                 "waiting-1"
               ],
-              "actions": [
+              "attentions": [
                 {
-                  "key": "remind",
-                  "arguments": {
-                    "channel": "#support",
-                    "text": "ACME waits for an answer to T-1042."
-                  },
-                  "reason": "Nobody has answered yet."
+                  "type": "needs_answer",
+                  "intent": "open",
+                  "reason": "ACME waits for an answer to T-1042."
                 }
               ]
             }
@@ -139,8 +150,8 @@
         },
         "now": "2026-11-02T09:01:00.000Z"
       },
-      "state_digest": "77e79cae681d80a724a91606cafd3e6ed2560e2a2d3abad70e02b3feef730e27",
-      "result_digest": "b6103ef7f9ae379f8220d9b4d22b5ba97c4a02d5af847c853f3601d23c012ce9"
+      "state_digest": "1924652803f4b0f988341cc2f43b7cc88808d72d513fa403e82120377fb107bb",
+      "result_digest": "19eb1457f5645eafd6d8680c62ebf842885fe4cfeb58b2cd6c136783d05dae21"
     },
     {
       "fn": "command",
@@ -175,6 +186,23 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_answer",
+              "description": "A customer waits for a first answer.",
+              "when": [
+                {
+                  "kind": "waiting_for_us",
+                  "match": {
+                    "inquiry": "inquiry"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "#support"
+              }
+            }
           ]
         },
         "command": {
@@ -185,8 +213,8 @@
         },
         "now": "2026-11-03T10:00:00.000Z"
       },
-      "state_digest": "6d3776c1c252859077460ca0a6013f4ca5ebf3baf59335350e45460dab815722",
-      "result_digest": "2364ab2b1bd3a2e0d2f974fc6d00e8b93ed3ac6bbd45c36f7e0f64cc7984c50d"
+      "state_digest": "0876c815d85d75a6952a6fcd7a734bf8e9a3ec43903751b2bbfbd9ac777ceb60",
+      "result_digest": "718198cd8221c7e78e736b6fb23932914d0cbe76fff4f7d89e12a7ea3b8b5b83"
     },
     {
       "fn": "assess",
@@ -221,6 +249,23 @@
                 }
               ]
             }
+          ],
+          "attention_types": [
+            {
+              "key": "needs_answer",
+              "description": "A customer waits for a first answer.",
+              "when": [
+                {
+                  "kind": "waiting_for_us",
+                  "match": {
+                    "inquiry": "inquiry"
+                  }
+                }
+              ],
+              "delivery": {
+                "route": "#support"
+              }
+            }
           ]
         },
         "case_id": "1cc8a18db9fb6e86f3c85267906ed0a48285818d6bd795401b9530c9b50c7f3d",
@@ -248,7 +293,7 @@
         ],
         "now": "2026-11-03T10:00:00.000Z"
       },
-      "result_digest": "fe6eda306583bdb75f6328ff506f73385a773007c98440a384467d9f2e00b9b6"
+      "result_digest": "597830d7b5685f4a12cb05bf903c0a8a9e1d5d7db9f613b45855a6404d6425ac"
     }
   ]
 }
