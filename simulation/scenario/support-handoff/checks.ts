@@ -39,11 +39,11 @@ export function checks(results: DayResult[], scenario: Scenario): CheckResult[] 
     d5?.deliveries.length === 1 && d5.deliveries[0]!.route === "support-lead", `${d5?.deliveries.map((x) => x.route).join(", ") ?? "no step"}`);
 
   // The Responsibility follows the case across the handoff: one case, with Engineering's ticket as its evidence.
-  const s5 = day(5)?.state;
-  const ids = Object.keys(s5?.cases ?? {});
-  add("By D5: one case only, SUP-1042", ids.length === 1 && ids[0] === sup, `${ids.length} case(s)`);
+  const extra = results.filter((r) => Object.keys(r.state?.cases ?? {}).some((id) => id !== sup)).map((r) => `D${r.day}`);
+  add("Every day: one case only, SUP-1042", !extra.length && results.some((r) => !!r.state?.cases[sup]),
+    extra.length ? `another case on ${extra.join(", ")}` : "");
   add("By D5: SUP-1042 has Engineering's ticket as evidence",
-    Object.keys(s5?.cases[sup]?.evidence ?? {}).some((id) => observation(id)?.kind === "engineering_tickets"));
+    Object.keys(day(5)?.state?.cases[sup]?.evidence ?? {}).some((id) => observation(id)?.kind === "engineering_tickets"));
 
   // D6: a person acted; the Attention is over, the Improvement stays for a person to decide.
   const d6 = day(6);

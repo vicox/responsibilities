@@ -60,6 +60,18 @@ test("an escalation on D4, before three days have passed, fails the run", async 
   assert.ok(failed.includes("D5: escalation opens on SUP-1042 with its check met"));
 });
 
+test("a second case for Engineering's ticket, on any day, fails the run", async () => {
+  const split = structuredClone(scripted) as Record<string, any>;
+  split["6"].proposals.push({
+    subject_type: "customer_case", subject_keys: [{ name: "case", value: "ENG-311" }], status: "open",
+    cites: ["engineering-tickets-d6"], title: "PDF export times out in the renderer", summary: null, attentions: [],
+  });
+  const r = await runOnce({ scenario, judge: replayJudge(split), checks });
+  assert.equal(Object.keys(r.results.find((x) => x.day === 6)!.state!.cases).length, 2, "the core opened the second case");
+  assert.equal(r.status, "failed");
+  assert.deepEqual(r.checks.filter((c) => !c.ok).map((c) => [c.name, c.detail]), [["Every day: one case only, SUP-1042", "another case on D6"]]);
+});
+
 test("the escalation's gate is the helpdesk's status: it holds while the case waits on Engineering", async () => {
   const r = await run();
   const opened = r.results.find((x) => x.day === 5)!.result!.attention_events[0]!;

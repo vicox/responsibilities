@@ -108,7 +108,7 @@ For `support-handoff`:
 - D1: case SUP-1042 opens; no Attention event, no delivery.
 - D2–D4: quiet (no Attention event, no delivery, no case opened or status changed). An escalation before three days have passed fails the run.
 - D5: `escalation` opens on SUP-1042 with its check `met`; exactly one delivery, to `support-lead`.
-- By D5: one case only, SUP-1042, with an `engineering_tickets` observation as its evidence.
+- Every day: one case only, SUP-1042. By D5 it has an `engineering_tickets` observation as its evidence.
 - D6: `escalation` closes, with no delivery; SUP-1042 stays open.
 - By D6: an Improvement cites the handoff (a D2 observation) and a day without progress (one from D3–D5).
 
@@ -166,7 +166,7 @@ The tests check both judges against fake `claude` and `codex` executables first 
 
 ## Tests
 
-`npm test` runs the simulation's tests with the core's, with no network and no real CLI: the scripted six-day arcs of both scenarios through the replay judge (every check above passes; for `security-fix`, D5 is quiet, D6's refusal is recorded and two runs give identical state digests; for `support-handoff`, one case across the handoff, one escalation that closes once a person acted while the Improvement stays, and an escalation on D4 fails the run), the prompt (every observation so far, no rule, no word of either scenario in the template, Improvements framed as observed possible gaps without remedies), parsing and the retry, the judges against fakes, redaction, the command line and `--pause`.
+`npm test` runs the simulation's tests with the core's, with no network and no real CLI: the scripted six-day arcs of both scenarios through the replay judge (every check above passes; for `security-fix`, D5 is quiet, D6's refusal is recorded and two runs give identical state digests; for `support-handoff`, one case across the handoff, one escalation that closes once a person acted while the Improvement stays, and an escalation on D4 or a second case for ENG-311 fails the run), the prompt (every observation so far, no rule, no word of either scenario in the template, Improvements framed as observed possible gaps without remedies), parsing and the retry, the judges against fakes, redaction, the command line and `--pause`.
 
 ## Live results
 
@@ -225,7 +225,7 @@ What the last two runs showed, with that rule:
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 52 s, not reported | `handoff-progress-and-customer-updates` (D6) |
 | 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 70 s, $0.27 | `handover-pickup-visibility` (D4), `customer-updates-while-waiting-on-other-team` (D5), both updated through D6 |
 
-Both runs used the rule 6 above. What they showed beyond the checks:
+Both runs used the rule 6 above. They ran when the one-case check looked at D5 only; it now holds on every day, and both journals show the same: one case opened, SUP-1042 on D1, and no other. What they showed beyond the checks:
 
 - Both held back on D2–D4 and escalated on D5, each giving the reason in the case's own terms: `codex` "The engineering ticket remains unassigned and unchanged, and the customer has gone more than three days without an update"; `claude` "ENG-311 has had no assignee and no change since 2026-11-03, and the customer hasn't heard from us since 2026-11-03 08:40, more than three days ago". Both closed the escalation on D6 because the case was moving again and the customer had been updated, and left SUP-1042 open.
 - Both linked Engineering's ticket to SUP-1042 on D2, and neither opened a second case for ENG-311. The core refused nothing in either run.
