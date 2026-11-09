@@ -154,9 +154,9 @@ What the first seven runs showed beyond the checks:
 
 What the last four runs showed:
 
-- With the reframed rule, `claude` proposed one Improvement on D3 and updated it on D4–D6: "Security fixes may be checked only against the reported payload, not the whole vulnerability class", and on D6, with the scan, "Injection fixes can count as done and be resolved at source without being checked against the whole vulnerability class". Its change says what could be checked before a report is resolved, with "could".
+- With the reframed rule, `claude` proposed one Improvement on D3 and updated it on D4–D6: "Security fixes may be checked only against the reported payload, not the whole vulnerability class", and on D6, with the scan, "Injection fixes can count as done and be resolved at source without being checked against the whole vulnerability class". Its change says what could be checked before a report is resolved, with "could", but still gives an example of how ("For example, check any element or attribute that can run script where the title is displayed").
 - With the reframed rule, `codex` proposed one Improvement on D6: "Macro title XSS fixes may cover too few payload forms", change "Security fixes could cover the range of executable markup accepted in macro titles more completely". Hedged, but about the one sink rather than how findings are closed.
-- The two draft runs used rule 6 without "not what happened in one case". Both hedged ("may", "could"), and both titled the Improvement after the one case: "The F-17 fix may cover only the reported payload, not the whole XSS weakness" (`claude`, D3–D5) and "Macro title XSS validation may miss alternative payloads" (`codex`, D6). That clause was added for it.
+- The two draft runs used rule 6 without "not what happened in one case". Both hedged ("may", "could"), and both titled the Improvement after the one case: "The F-17 fix may cover only the reported payload, not the whole XSS weakness" (`claude`, D3; its updates on D4–D6 stayed about F-17) and "Macro title XSS validation may miss alternative payloads" (`codex`, D6). That clause was added for it.
 
 ## Out of scope
 
