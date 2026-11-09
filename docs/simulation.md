@@ -41,9 +41,9 @@ Nothing in the Responsibility mentions re-testing a fix.
 | D3 | PR #88 merged as `c0ffee1`: "remove `<img>` elements from macro title before rendering"; CI on `c0ffee1` passed | — | Update F-17 |
 | D4 | SEC-42 `Done`; F-17 `resolved` | Resolving F-17 passes the closing check; success stays `unknown` | Resolve F-17 |
 | D5 | Release candidate `3.2.0-rc1` at `d00d2b7`, contains `c0ffee1`, `awaiting_release` | Quiet: no Attention event, no delivery, no case opened or reopened | Nothing, or new evidence on F-17 |
-| D6 | Pre-release scan DAST-301 of `3.2.0-rc1` at `d00d2b7`: same CWE, location, parameter and sink, payload `<svg/onload=…>`, executed on page view, `open` | Opening `release_review` on DAST-301 passes with both rules `met`; one delivery to `release-review`. Reopening F-17 is refused (`REOPEN_WHILE_CLOSING_MET`): its source still says resolved | Open case DAST-301 citing the scan, and `release_review`. Infer that the build contains the fix and the same sink is still exploitable. Propose an Improvement, citing the scan and F-17's earlier evidence |
+| D6 | Pre-release scan DAST-301 of `3.2.0-rc1` at `d00d2b7`: same CWE, location, parameter and sink, payload `<svg/onload=…>`, executed on page view, `open` | Opening `release_review` on DAST-301 passes with both rules `met`; one delivery to `release-review`. Reopening F-17 is refused (`REOPEN_WHILE_CLOSING_MET`): its source still says resolved | Open case DAST-301 citing the scan, and `release_review`. Infer that the build contains the fix and the same sink is still exploitable. Propose an Improvement, a possible gap rather than a prescription, citing the scan and F-17's earlier evidence |
 
-A refusal is audit context only: the report shows it, and nothing cites it. An Improvement cites observations only, never a case or a refusal; which change it proposes is the model's.
+A refusal is audit context only: the report shows it, and nothing cites it. An Improvement cites observations only, never a case or a refusal; which possible gap it identifies, and in what words, is the model's.
 
 `scripted.json` holds a judge's answers written by hand, one per day. Only the tests use it.
 
@@ -68,7 +68,7 @@ At the end of a run, `simulation/scenario/security-fix/checks.ts` decides what c
 - D6: case DAST-301 opens citing the scan; `release_review` opens on it with both rules `met`; exactly one delivery, to `release-review`; an Improvement cites the scan and an F-17 observation from D1–D4.
 - Every day: a usable answer, trace checks pass, no tool ran; all six days ran; no secret value in the run directory.
 
-Whether the Improvement proposes a sensible, evidence-backed change is for a person to judge from the report. A failed check or day makes the run FAILED and the exit code 1.
+Whether the Improvement identifies a plausible gap, no more certainly than its evidence allows, is for a person to judge from the report. A failed check or day makes the run FAILED and the exit code 1.
 
 ## The judges
 
@@ -118,7 +118,7 @@ The tests check both judges against fake `claude` and `codex` executables first 
 
 ## Tests
 
-`npm test` runs the simulation's tests with the core's, with no network and no real CLI: the scripted six-day arc through the replay judge (every check above passes, D5 is quiet, D6's refusal is recorded, two runs give identical state digests), the prompt (every observation so far, no rule, no scenario word in the template), parsing and the retry, the judges against fakes, redaction and `--pause`.
+`npm test` runs the simulation's tests with the core's, with no network and no real CLI: the scripted six-day arc through the replay judge (every check above passes, D5 is quiet, D6's refusal is recorded, two runs give identical state digests), the prompt (every observation so far, no rule, no scenario word in the template, Improvements framed as possible gaps), parsing and the retry, the judges against fakes, redaction and `--pause`.
 
 ## Live results
 
@@ -133,18 +133,30 @@ Each live run is one row; a criterion is PASS or FAIL as `report.md` gives it. T
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 43 s, not reported | `macro-title-xss-verification` |
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 44 s, not reported | `xss-fix-validation` |
 | 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 49 s, not reported | `macro-title-xss-regression` |
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 44 s, not reported | `macro-title-xss-fix-validation` (draft of the reframed rule 6) |
+| 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 73 s, $0.25 | `fix-scope-vs-reported-payload` (draft of the reframed rule 6) |
+| 2026-11-09 | claude | 2.1.319 | claude-opus-5-5 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 79 s, $0.26 | `fix-covers-vulnerability-class` (reframed rule 6) |
+| 2026-11-09 | codex | 0.160.0 | CLI default, not reported | PASS | PASS | PASS | PASS | PASS | PASS | PASS | 44 s, not reported | `macro-title-xss-fix-coverage` (reframed rule 6) |
 
-With `claude`, a day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). With `codex`, a day took 5–12 seconds; all three runs used the judge with the tool features disabled.
+With `claude`, a day took 5–35 seconds and $0.01–0.10; the first run predates cost in the journal, and the fourth ran after the review fixes (redaction, no-tool proof, process groups). With `codex`, a day took 5–12 seconds; all three runs used the judge with the tool features disabled. The last four rows ran after the Improvements were reframed (below).
 
-**A person's verdict (2026-11-09).** The user reviewed the Improvements of these runs and accepted their wording and content: independent verification of a security fix before the finding is marked resolved at its source. The user also confirmed the scenario as it is, with its two cases, F-17 and DAST-301.
+**A person's verdict (2026-11-09).** The user reviewed the Improvements of the first seven runs and accepted their wording and content: independent verification of a security fix before the finding is marked resolved at its source. The user also confirmed the scenario as it is, with its two cases, F-17 and DAST-301.
 
-What the runs showed beyond the checks:
+What the first seven runs showed beyond the checks:
 
 - `claude` saw the weak fix before the scan did. In every run it proposed a first Improvement on D3, because PR #88 only strips `<img>` and CI ran no security test, and refined or added Improvements on D4 and D5; on D6 it updated them with the scan as new evidence, or proposed another (reopen the original finding when a scan bypasses its fix). The changes it proposed: encode output at the sink instead of filtering tags, a regression test with bypass payloads, no resolving at the source before a security sign-off or retest, and release review for candidates that carry an unchecked security fix.
 - `codex` was terser. Twice it proposed its Improvement only on D6, from the scan; once on D3, updated on D6 with the scan. All three ask for regression tests with executable markup beyond `<img>` (SVG named); two ask for the fix to be checked against the original sink, or by security, before the report is resolved at its source; one asks for escaping or sanitizing for the rendering context.
 - The D6 check therefore accepts an update as well as a new Improvement.
 - No run proposed reopening F-17. On D5 every `claude` run linked the release candidate to the resolved F-17 as evidence; every `codex` run proposed nothing. Both leave the day quiet.
 - On D6 every run of both judges also asked for `security_review` on DAST-301. The core refused it with `ATTENTION_GATE_NOT_MET`, the rule `unknown` because no Bugcrowd row lists DAST-301, and the report shows the refusal as audit context.
+
+**Improvements reframed (2026-11-09).** After that verdict the user set the principle: Attentions identify where action is needed; Improvements identify where something could work better. An Improvement is an evidence-grounded observation of a possible gap in how the work is done, not a confident prescription or a redesign of the workflow. Rule 6 of the prompt now says so, and asks for the gap in how the work is done, not what happened in one case, stated no more certainly than the evidence. The scripted D6 Improvement went from "re-test the fixed build against the reported sink … before resolving" to "Security findings may be closed before fixes are independently verified", citing F-17's report, fix and resolution and the DAST-301 scan. The core, the scenario, the Attentions and the checks are unchanged.
+
+What the last four runs showed:
+
+- With the reframed rule, `claude` proposed one Improvement on D3 and updated it on D4–D6: "Security fixes may be checked only against the reported payload, not the whole vulnerability class", and on D6, with the scan, "Injection fixes can count as done and be resolved at source without being checked against the whole vulnerability class". Its change says what could be checked before a report is resolved, with "could".
+- With the reframed rule, `codex` proposed one Improvement on D6: "Macro title XSS fixes may cover too few payload forms", change "Security fixes could cover the range of executable markup accepted in macro titles more completely". Hedged, but about the one sink rather than how findings are closed.
+- The two draft runs used rule 6 without "not what happened in one case". Both hedged ("may", "could"), and both titled the Improvement after the one case: "The F-17 fix may cover only the reported payload, not the whole XSS weakness" (`claude`, D3–D5) and "Macro title XSS validation may miss alternative payloads" (`codex`, D6). That clause was added for it.
 
 ## Out of scope
 

@@ -94,7 +94,7 @@ export interface Proposal {
   attentions?: ProposedAttention[];
 }
 
-/** A proposed change to how the work is done, independent of any one Case. */
+/** Where something could work better: a possible gap in how the work is done, independent of any one Case. */
 export interface ProposedImprovement {
   /** Names the Improvement; the same key again updates it. */
   key: string;

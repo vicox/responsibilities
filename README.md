@@ -17,7 +17,7 @@ An alert is forgotten. A ticket is closed while the customer is still waiting. A
 Responsibilities connects what should happen with what actually happens through four steps: **Observe → Judge → Decide → Deliver**.
 
 1. **Observe** — Your application collects facts and calls `view` to give the LLM the relevant context: expectations, observations, the cases so far and the kinds of attention a case can need.
-2. **Judge** — The LLM interprets that context and proposes which cases to open or resolve, which Attentions to open or close, and, optionally, Improvements to how the work is done.
+2. **Judge** — The LLM interprets that context and proposes which cases to open or resolve, which Attentions to open or close, and, optionally, Improvements: where something could work better.
 3. **Decide** — Responsibilities uses `step` to validate those proposals, update case state, and return the deliveries.
 4. **Deliver** — Your application delivers each Attention to its route, such as a team's inbox. People act; what they did becomes new observations, and the cycle continues.
 
@@ -34,7 +34,7 @@ People can intervene through `command`, and `assess` checks whether a case achie
 - **Case** – one subject under the Responsibility, here one inquiry: `open`, `resolved` or `dismissed`, with linked evidence, an `episode` that counts status changes, and its Attentions.
 - **Attention** – a person or team should look at a case. Its type may have `when` rules that must be met before it opens, and a `delivery` route. The LLM proposes opening, keeping or closing it; the core checks the opening.
 - **Delivery** – one opening or reopening of a routed Attention, with a stable id. The host delivers it; the core never sends anything.
-- **Improvement** – a proposed change to how the work is done, citing the observations it rests on. It is independent of any one case, and a person decides what to do with it.
+- **Improvement** – an observation of a possible gap in how the work is done, citing the observations it rests on; not an instruction. Attentions identify where action is needed; Improvements identify where something could work better. An Improvement is independent of any one case, and a person decides what, if anything, to change.
 
 ## API at a glance
 
