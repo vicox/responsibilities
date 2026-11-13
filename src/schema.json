@@ -312,14 +312,27 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["case_id", "subject", "status", "episode", "title", "attentions"],
+            "required": [
+              "case_id", "subject", "status", "episode", "title", "summary",
+              "evidence", "first_observed", "last_observed", "attentions"
+            ],
             "additionalProperties": false,
             "properties": {
               "case_id": { "$ref": "#/$defs/hash" },
               "subject": { "$ref": "#/$defs/subject" },
               "status": { "$ref": "#/$defs/status" },
               "episode": { "$ref": "#/$defs/ordinal" },
-              "title": { "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+              "title": {
+                "description": "Earlier assessment by a judge, recorded in an earlier run: history, not evidence and not current truth.",
+                "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }]
+              },
+              "summary": {
+                "description": "Earlier assessment by a judge, recorded in an earlier run: history, not evidence and not current truth.",
+                "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }]
+              },
+              "evidence": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+              "first_observed": { "$ref": "#/$defs/time" },
+              "last_observed": { "$ref": "#/$defs/time" },
               "attentions": { "type": "array", "items": { "$ref": "#/$defs/text" } }
             }
           }
@@ -339,6 +352,7 @@
           }
         },
         "improvements": {
+          "description": "Earlier proposals by a judge, for a person to decide on: history, not evidence.",
           "type": "array",
           "items": {
             "type": "object",

@@ -24,7 +24,7 @@ A rule reads the latest observation of its `kind` (by `occurred_at`, then `id`) 
 { type, intent: "open" | "keep" | "close", reason }
 ```
 
-An Attention says that a person or team should look at a case. A case holds at most one Attention per type, `open` or `closed`, with its `activation`: 1 for the first opening, one more for each reopening. Keys are unique; their order in the definition is not an input. The LLM sees each type's key, description, whether a check gates it (`checked`) and whether it is delivered (`routed`), never its rules.
+An Attention says that action is needed in a case. It is neither the action nor a message: the core records it and, for a routed type, returns a delivery; who acts is the host's. A case holds at most one Attention per type, `open` or `closed`, with its `activation`: 1 for the first opening, one more for each reopening. Keys are unique; their order in the definition is not an input. The LLM sees each type's key, description, whether a check gates it (`checked`) and whether it is delivered (`routed`), never its rules.
 
 Each entry of a proposal is checked in this order; the first that applies decides:
 
@@ -56,6 +56,8 @@ An Improvement identifies where something could work better: a possible gap in h
 4. Per proposal: whole-proposal gates; cited observations are linked as evidence (a new case is created `open`); the status gate; title and summary; the Attention entries.
 5. One transition per proposal that changed the case's status, evidence or text.
 6. The Improvements; then `state.now = now`.
+
+No closing, `when` or success rule and no status or Attention gate uses a case's title or summary, an Attention's reason or an Improvement's text as a fact. These are earlier assessments: validated as text, digested and compared to detect a change, but never decisive.
 
 ### Transitions and events
 

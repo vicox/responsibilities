@@ -129,7 +129,11 @@ export function view(definition: Definition, state: State | null, observations: 
     observations: all.filter((o) => d.include.includes(o.kind)),
     cases: Object.keys(cases).sort(compare).map((id) => {
       const c = cases[id]!;
-      return { case_id: id, subject: c.subject, status: c.status, episode: c.episode, title: c.title, attentions: openAttentions(c) };
+      return {
+        case_id: id, subject: c.subject, status: c.status, episode: c.episode, title: c.title, summary: c.summary,
+        evidence: Object.keys(c.evidence).sort(compare), first_observed: c.first_observed, last_observed: c.last_observed,
+        attentions: openAttentions(c),
+      };
     }),
     attention_types: (d.attention_types ?? []).map((t) => ({ key: t.key, description: t.description, checked: t.when !== undefined, routed: t.delivery !== undefined })),
     improvements: improvements.map(({ key, title, change }) => ({ key, title, change })),
