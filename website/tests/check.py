@@ -10,7 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = "https://responsibilities.dev/"
 PAGES = {"index.html": SITE, "impressum.html": SITE + "impressum.html"}  # page: canonical
-README = "https://github.com/vicox/responsibilities#readme"  # the only external link
+README = "https://github.com/vicox/responsibilities#readme"  # the external links: the README
+SIMULATION = "https://github.com/vicox/responsibilities/blob/main/docs/simulation.md"  # and the simulation
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 failures = []
@@ -122,12 +123,13 @@ for name, canonical in PAGES.items():
     check(any(url == "impressum.html" for _, _, url in page.links), f"{name}: no link to impressum.html")
 
     # Links: local URLs are relative, exist and, with a fragment, point at an id that exists;
-    # the only absolute URLs are mailto:, the page's own canonical and the README on GitHub.
+    # the only absolute URLs are mailto:, the page's own canonical, the README and the
+    # simulation on GitHub.
     for tag, rel, url in page.links:
         if url.startswith("mailto:"):
             continue
         if re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I) or url.startswith("//"):
-            check((url == canonical and rel == "canonical") or (tag == "a" and url == README),
+            check((url == canonical and rel == "canonical") or (tag == "a" and url in (README, SIMULATION)),
                   f"{name}: unexpected absolute URL: {url}")
             continue
         path, _, fragment = url.partition("#")
@@ -141,28 +143,30 @@ for name, canonical in PAGES.items():
             linked = pages.get(target.relative_to(ROOT).as_posix())
             check(linked is not None and fragment in linked[1].ids, f"{name}: anchor {url} has no target")
     absolute = set(re.findall(r"https?://[^\s\"'<>)]+", html))
-    check(absolute <= {SITE, canonical, README}, f"{name}: external references: {sorted(absolute - {SITE, canonical, README})}")
+    allowed = {SITE, canonical, README, SIMULATION}
+    check(absolute <= allowed, f"{name}: external references: {sorted(absolute - allowed)}")
 
 # The concept page: Open Graph and required content
 html, page = pages["index.html"]
 for key in ("og:type", "og:site_name", "og:url", "og:title", "og:description", "twitter:card"):
     check(key in page.meta, f"index.html: missing meta {key}")
 check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
-# The hero, word for word and in order: the short claim, the line under it and the lede. The
-# title and footers carry the short claim; the description and Open Graph tags stand alone in a
-# search result or a shared link, so they carry the full positioning.
-H1 = "The responsibility layer."
-SUBHEAD = "For human, agent, and automated work."
-LEDE = ("Customers need answers. Bookings need payment. Important changes need follow-through. "
-        "Define what should happen, recognise what needs attention, and follow each case through.")
-TITLE = "Responsibilities — The responsibility layer"
-OG_TITLE = "The responsibility layer for human, agent, and automated work."
-DESCRIPTION = ("Define what should happen, recognise what needs attention, and follow each case through — "
-               "whether the work is done by people, agents or automations.")
+# The hero, word for word and in order: the claim, the one line under it, then the CTAs and
+# nothing else. The title, og:title and footers carry the claim; the description and
+# og:description stand alone in a search result or a shared link, so they say a little more.
+H1 = "Persistent Responsibilities for AI Agents"
+SUBHEAD = ("Give AI agents something to own beyond a single task — "
+           "with persistent context, evidence, and decisions across runs.")
+TITLE = "Persistent Responsibilities for AI Agents — responsibilities.dev"
+OG_TITLE = H1
+DESCRIPTION = ("Give AI agents something to own beyond a single task: a lasting expectation, judged run after run, "
+               "with persistent context, evidence and decisions. People stay accountable.")
 hero = re.search(r'<section class="hero"[^>]*>(.*?)</section>', html, re.S)
-hero_lines = re.findall(r"<(h1|p) ([^>]*)>(.*?)</\1>", hero.group(1), re.S)[:3] if hero else []
-check(hero_lines == [("h1", 'id="hero-title"', H1), ("p", 'class="subhead"', SUBHEAD), ("p", 'class="lede"', LEDE)],
-      f"index.html: the hero must open with the H1 '{H1}', then the subhead '{SUBHEAD}', then the lede, word for word")
+HERO = (f'<div class="wrap"> <h1 id="hero-title">{H1}</h1> <p class="subhead">{SUBHEAD}</p> <p class="cta"> '
+        f'<a class="button" href="{README}">Get started on GitHub</a> '
+        '<a href="#how">See how it works <span aria-hidden="true">→</span></a> </p> </div>')
+check(hero and re.sub(r"\s+", " ", hero.group(1)).strip() == HERO,
+      f"index.html: the hero must be the H1 '{H1}', the one subhead '{SUBHEAD}' and the CTAs, and nothing else")
 # Two CTAs, in order: the README on GitHub, then the explanation on this page
 cta = re.search(r'<p class="cta">(.*?)</p>', html, re.S)
 check(cta and re.findall(r"<a [^>]*>.*?</a>", cta.group(1), re.S) == [
@@ -170,7 +174,7 @@ check(cta and re.findall(r"<a [^>]*>.*?</a>", cta.group(1), re.S) == [
     '<a href="#how">See how it works <span aria-hidden="true">→</span></a>',
 ], "index.html: the hero CTAs must be 'Get started on GitHub' (the README) and 'See how it works →' (#how)")
 check(page.title == TITLE, f"index.html: title must be {TITLE!r}: {page.title!r}")
-check(page.meta.get("og:title") == [OG_TITLE], f"index.html: og:title must be the full positioning: {OG_TITLE}")
+check(page.meta.get("og:title") == [OG_TITLE], f"index.html: og:title must be the claim: {OG_TITLE}")
 check(page.meta.get("description") == [DESCRIPTION], "index.html: meta description is not verbatim")
 check(page.meta.get("og:description") == [DESCRIPTION], "index.html: og:description must match the meta description")
 for name in PAGES:
@@ -181,26 +185,53 @@ for name in PAGES:
 for phrase in (
     '<p class="eyebrow">01 · How responsibilities work</p>',
     "Responsibilities stay. Matters come and go.",
+    "Most agent work is a task: a prompt, a run, a result.",
     "A responsibility says what should be true and who answers for it.",
-    "each concrete matter that needs attention is a <strong>case</strong>",
+    "An agent can take it on, run after run.",
     "Actions can change the situation; fresh evidence shows what changed.",
-    "A case can end without the expected outcome being achieved.",
     "Three responsibilities, three kinds of attention.",
+    "<p>Each is something an agent can own: not a task to finish, but an expectation to keep true.</p>",
     "Delegate the work. Keep the responsibility.",
     "That gives you a basis for handing over more, step by step, and improving the agent as you go.",
     "<span>Observe deterministically.</span>",
     "<span>Judge probabilistically.</span>",
     "<span>Remember persistently.</span>",
+    "<p>No fixed workflow, no dashboard to watch. In each run, the agent evaluates new evidence against the "
+    "lasting expectation and everything known so far. Nothing has to run in between, and the next run "
+    "needn’t be the same agent.</p>",
     '<p class="eyebrow">05 · Built for developers</p>',
     "Four functions. One responsibility lifecycle.",
     "pure functions over plain JSON: deterministic TypeScript with no runtime dependencies.",
+    "Your host handles scheduling, models, tools and persistence.",
     "Optional: a person decides. A human override",
     "Closed is not success.",
     "Delegating the work does not automatically transfer accountability.",
+    "An agent can own a responsibility day to day; a person still answers for it.",
     "Accountability can change hands through an explicit handover.",
     "Its view is only as current and complete as its observations.",
+    "An agent acts only with the tools and permissions its host gives it",
 ):
     check(phrase in html, f"index.html: missing text: {phrase}")
+
+# How responsibilities work: the four concepts, in order and word for word. A case is not
+# defined by an Attention, and an Attention is a need to act, not one person's task.
+CONCEPTS = [
+    ("Responsibility", "What should stay true and who answers for it, written as expectations an agent can judge "
+                       "against. Versioned: each recorded decision names the version it was made under."),
+    ("Judgment", "A run judges new evidence against the expectation and what came before, and decides what follows. "
+                 "Its decisions are kept with the evidence behind them."),
+    ("Case", "One concrete situation, followed across runs until it is over: this customer, waiting for three days; "
+             "this booking, still unpaid. A case can end without the expected outcome being achieved."),
+    ("Attention", "A situation that requires action. The agent can act on it itself, or pass it to another agent "
+                  "or a person. It can open early or late in a case, and close while the case goes on."),
+]
+concepts = re.search(r'<dl class="concepts">(.*?)</dl>', html, re.S)
+cards = re.findall(r'<div class="card">\s*<dt>(.*?)</dt>\s*<dd>(.*?)</dd>\s*</div>', concepts.group(1), re.S) if concepts else []
+check(concepts and re.sub(r'<div class="card">\s*<dt>.*?</dt>\s*<dd>.*?</dd>\s*</div>', "", concepts.group(1), flags=re.S).strip() == "",
+      "index.html: the concepts list holds nothing but its cards")
+check(cards == CONCEPTS, f"index.html: the concepts must be {', '.join(term for term, _ in CONCEPTS)}, word for word")
+how = re.search(r'<section id="how"(.*?)</section>', html, re.S)
+check(how and concepts and concepts.group(0) in how.group(1), "index.html: the concepts belong to How responsibilities work")
 
 # The three examples, in order: each title, and the sentence that keeps evidence, the end of a
 # case and its outcome apart
@@ -220,18 +251,25 @@ for item, (title, sentence) in zip(items, EXAMPLES):
     check(sentence in item, f"index.html: {title}: missing: {sentence}")
 check("<details" not in html, "index.html: the examples have no disclosures")
 
-# The delegation story: four steps, closing its case on the recorded reply
+# The delegation story: four steps, the responsibility's next run finding what the agent left,
+# and the case closing on the recorded reply
 story = re.search(r'<ol class="story"[^>]*>(.*?)</ol>', html, re.S)
 check(story and story.group(1).count("<li>") == 4, "index.html: the delegation story must have four steps")
+check(story and "On Thursday the responsibility’s next run finds the request still waiting in the support system, "
+                "whatever the agent reported or didn’t. A case comes to your attention." in story.group(1),
+      "index.html: the story's third step must be the responsibility's next run")
 check(story and "The support system records your reply, and the case closes." in story.group(1),
       "index.html: the story must close its case on the recorded reply")
 
-# Architecture: observe, judge, remember, each with its tag and its text
+# Architecture: observe, judge, remember, each with its tag and its text, and no fourth step
 FLOW = [
-    ("Observe", "Signals", "Signals run the same queries against the systems of record, every time."),
-    ("Judge", "AI + rules", "A model reads the facts against the expectations and proposes cases with their evidence. "
-                            "Code checks what can be checked exactly."),
-    ("Remember", "Persistent cases", "Cases keep their history across runs, so each judgment starts from what is already known."),
+    ("Observe", "Evidence", "Signals run the same queries against the systems of record, every time. "
+                            "What they find is kept as evidence, and relevant new evidence can start the next run."),
+    ("Judge", "Decisions", "The agent evaluates new evidence against the expectation and its history, decides what "
+                           "matters, and determines what to do next. It can act through its host’s tools, involve "
+                           "another agent or a person, or decide that no action is needed."),
+    ("Remember", "Context", "The responsibility, its cases, the evidence they rest on and every decision carry over, "
+                            "so each judgment starts from what is already known."),
 ]
 flow = re.search(r'<ol class="flow"[^>]*>(.*?)</ol>', html, re.S)
 steps = re.findall(r"<li>(.*?)</li>", flow.group(1), re.S) if flow else []
@@ -240,12 +278,13 @@ for item, (title, tag, sentence) in zip(steps, FLOW):
     check(f"<h3>{title}</h3>" in item and f'<p class="tag">{tag}</p>' in item and f"<p>{sentence}</p>" in item,
           f"index.html: flow step {title} must be tagged {tag} and say: {sentence}")
 
-# Built for developers: the four functions, in order, and the README
+# Built for developers: the four functions, in order, the simulation and the README
 functions = re.search(r'<dl class="functions">(.*?)</dl>', html, re.S)
 check(functions and re.findall(r"<dt><code>(\w+)</code></dt>", functions.group(1)) == ["view", "step", "command", "assess"],
       "index.html: the functions must be view, step, command, assess")
 developers = re.search(r'<section id="developers"(.*?)</section>', html, re.S)
 check(developers and f'href="{README}"' in developers.group(1), "index.html: Built for developers must link the README")
+check(developers and f'href="{SIMULATION}"' in developers.group(1), "index.html: Built for developers must link the simulation")
 
 order = [html.find(f'id="{section}"') for section in ("how", "examples", "delegation", "architecture", "developers", "accountability")]
 check(-1 not in order and order == sorted(order),
@@ -258,7 +297,8 @@ for phrase in (
     "Five things that should never be forgotten", "Tasks end. Responsibilities don’t.",
     "Agents are responsible.", "Alina", "It takes both", "come back to your attention",
     "Who answers for it doesn’t", "not surveillance", "changes the world", "stops falling",
-    "Keep sight of what you",
+    "Keep sight of what you", "The responsibility layer", "For human, agent, and automated work.",
+    "each concrete matter that needs attention", "runs alongside the work",
 ):
     check(phrase not in html, f"index.html: superseded text: {phrase}")
 

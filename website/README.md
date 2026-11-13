@@ -1,7 +1,7 @@
 # responsibilities.dev
 
-The one-page concept site for responsibilities.dev: *The responsibility layer.* Plain HTML and
-CSS: no build step, framework, JavaScript or dependency.
+The one-page concept site for responsibilities.dev: *Persistent Responsibilities for AI Agents.*
+Plain HTML and CSS: no build step, framework, JavaScript or dependency.
 
 | File | Purpose |
 | --- | --- |
@@ -17,7 +17,8 @@ Assets are linked with relative URLs (`styles.css`, `favicon.svg`, `#examples`,
 `impressum.html`), so the pages work the same at `https://responsibilities.dev/`, under a
 project path such as `https://<user>.github.io/responsibilities.dev/` and on a local server.
 The only absolute URLs are each page's canonical link, the home page's `og:url`, its links to
-the README on GitHub and the Impressum's `mailto:` contact.
+the README and the simulation (`docs/simulation.md`) on GitHub and the Impressum's `mailto:`
+contact.
 
 Both pages link the stylesheet as `styles.css?v=<hash>`, the first eight hex digits of the
 SHA-256 of `styles.css`. GitHub Pages lets browsers and its CDN cache files for ten minutes, so
@@ -32,14 +33,14 @@ the checks: they print the link to use.
 The checks cover, on both pages, well-formed markup, one `h1` and no skipped heading levels,
 the meta tags, a link to the Impressum, a footer that
 repeats the claim, and that every link resolves (anchors on the other page included) and
-nothing external is loaded; plus the home page's key content (the hero word for word: claim,
-subhead and lede in order, and its two calls to action; the title with the short claim, and the
-description and Open Graph tags with the full positioning; the three examples and their key
-sentences; the four steps of the delegation story; the three steps of *Architecture*, each with
-its tag and text; the four functions and the README link in *Built for developers*; the order
-of the sections), wording that was retired and stays gone, a list of words the site does not
-use, the Impressum's required parts, the `CNAME`, and WCAG AA contrast of the colour pairs in
-both colour schemes.
+nothing external is loaded; plus the home page's key content (the hero word for word: the claim,
+its one subhead and its two calls to action, nothing else; the title and `og:title` with the
+claim, and the description and `og:description`; the four concepts of *How responsibilities
+work*, word for word; the three examples and their key sentences; the four steps of the delegation story; the
+three steps of *Architecture*, each with its tag and text; the four functions and the links to
+the simulation and the README in *Built for developers*; the order of the sections), wording
+that was retired and stays gone, a list of words the site does not use, the Impressum's required
+parts, the `CNAME`, and WCAG AA contrast of the colour pairs in both colour schemes.
 
 ## Deploy on GitHub Pages
 
