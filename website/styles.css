@@ -186,25 +186,24 @@ var {
   text-transform: uppercase;
 }
 
-/* The home page's H1 fits on one line from tablet width up. On phones it breaks after
-   "responsibility", and is small enough there to stay on two lines down to 320px. */
+/* The home page's H1 breaks after "Responsibilities" from tablet width up. On phones it takes
+   three lines, and is small enough there to keep "Responsibilities" whole down to 320px. */
 h1 {
-  max-width: 22ch;
   margin: 0;
-  font-size: clamp(2rem, 4.75vw + 1rem, 4.75rem);
+  font-size: clamp(2rem, 4vw + 1rem, 4.25rem);
   line-height: 1.04;
   letter-spacing: -0.03em;
 }
 
-/* The line under the H1 that says whose work it is: smaller and quieter than the claim. */
+/* The one line under the H1, a full sentence: smaller and quieter than the claim. */
 .subhead {
   max-width: var(--measure);
-  margin: 0.75rem 0 0;
+  margin: 1rem 0 0;
   color: var(--muted);
-  font-size: clamp(1.375rem, 1.5vw + 1rem, 2rem);
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.25rem, 0.75vw + 1rem, 1.625rem);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
@@ -350,7 +349,8 @@ h3 {
   font-size: 0.85rem;
 }
 
-.story-close {
+.story-close,
+.proof {
   max-width: var(--measure);
   margin: 2rem 0 0;
   color: var(--muted);
@@ -419,8 +419,9 @@ h3 {
   }
 }
 
-/* Functions: four cards, two by two, stacked on narrow screens */
+/* Concepts and functions: four cards, two by two, stacked on narrow screens */
 
+.concepts,
 .functions {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -428,11 +429,13 @@ h3 {
   margin: 0;
 }
 
+.concepts dt,
 .functions dt {
   font-size: 1.2rem;
   font-weight: 700;
 }
 
+.concepts dd,
 .functions dd {
   margin: 0.6rem 0 0;
   color: var(--muted);
@@ -444,6 +447,7 @@ h3 {
 }
 
 @media (max-width: 56rem) {
+  .concepts,
   .functions {
     grid-template-columns: 1fr;
   }

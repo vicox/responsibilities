@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Responsibilities — The responsibility layer</title>
-  <meta name="description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
+  <title>Persistent Responsibilities for AI Agents — responsibilities.dev</title>
+  <meta name="description" content="Give AI agents something to own beyond a single task: a lasting expectation, judged run after run, with persistent context, evidence and decisions. People stay accountable.">
   <link rel="canonical" href="https://responsibilities.dev/">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
@@ -12,11 +12,11 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="responsibilities.dev">
   <meta property="og:url" content="https://responsibilities.dev/">
-  <meta property="og:title" content="The responsibility layer for human, agent, and automated work.">
-  <meta property="og:description" content="Define what should happen, recognise what needs attention, and follow each case through — whether the work is done by people, agents or automations.">
+  <meta property="og:title" content="Persistent Responsibilities for AI Agents">
+  <meta property="og:description" content="Give AI agents something to own beyond a single task: a lasting expectation, judged run after run, with persistent context, evidence and decisions. People stay accountable.">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=0a217ad7">
+  <link rel="stylesheet" href="styles.css?v=aabf026b">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -40,9 +40,8 @@
   <main id="main" tabindex="-1">
     <section class="hero" aria-labelledby="hero-title">
       <div class="wrap">
-        <h1 id="hero-title">The responsibility layer.</h1>
-        <p class="subhead">For human, agent, and automated work.</p>
-        <p class="lede">Customers need answers. Bookings need payment. Important changes need follow-through. Define what should happen, recognise what needs attention, and follow each case through.</p>
+        <h1 id="hero-title">Persistent Responsibilities for AI Agents</h1>
+        <p class="subhead">Give AI agents something to own beyond a single task — with persistent context, evidence, and decisions across runs.</p>
         <p class="cta">
           <a class="button" href="https://github.com/vicox/responsibilities#readme">Get started on GitHub</a>
           <a href="#how">See how it works <span aria-hidden="true">→</span></a>
@@ -55,9 +54,27 @@
         <div class="section-head">
           <p class="eyebrow">01 · How responsibilities work</p>
           <h2 id="how-title">Responsibilities stay. Matters come and go.</h2>
-          <p>A responsibility says what should be true and who answers for it. Within it, each concrete matter that needs attention is a <strong>case</strong>: this customer, waiting for three days; this booking, still unpaid. Attention can mean a review, a decision, accepting something as it is, or an action.</p>
-          <p>Cases come from facts. What the systems show, such as the support inbox or the payment system, is read against what is expected. Actions can change the situation; fresh evidence shows what changed. A case can end without the expected outcome being achieved.</p>
+          <p>Most agent work is a task: a prompt, a run, a result. Much of what matters isn’t. “Customers waiting on us get an answer within two working days” is never finished; it has to stay true. A responsibility says what should be true and who answers for it. An agent can take it on, run after run.</p>
+          <p>Cases come from facts. What the systems show, such as the support inbox or the payment system, is read against what is expected. Actions can change the situation; fresh evidence shows what changed.</p>
         </div>
+        <dl class="concepts">
+          <div class="card">
+            <dt>Responsibility</dt>
+            <dd>What should stay true and who answers for it, written as expectations an agent can judge against. Versioned: each recorded decision names the version it was made under.</dd>
+          </div>
+          <div class="card">
+            <dt>Judgment</dt>
+            <dd>A run judges new evidence against the expectation and what came before, and decides what follows. Its decisions are kept with the evidence behind them.</dd>
+          </div>
+          <div class="card">
+            <dt>Case</dt>
+            <dd>One concrete situation, followed across runs until it is over: this customer, waiting for three days; this booking, still unpaid. A case can end without the expected outcome being achieved.</dd>
+          </div>
+          <div class="card">
+            <dt>Attention</dt>
+            <dd>A situation that requires action. The agent can act on it itself, or pass it to another agent or a person. It can open early or late in a case, and close while the case goes on.</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
@@ -66,6 +83,7 @@
         <div class="section-head">
           <p class="eyebrow">02 · Examples</p>
           <h2 id="examples-title">Three responsibilities, three kinds of attention.</h2>
+          <p>Each is something an agent can own: not a task to finish, but an expectation to keep true.</p>
         </div>
         <ol class="examples" role="list">
           <li class="card">
@@ -94,7 +112,7 @@
         <ol class="story" role="list">
           <li>You hand the routine replies to an agent. What you answer for stays the same.</li>
           <li>On Tuesday the agent runs out of tokens and stops. A customer who has just written in hears nothing.</li>
-          <li>On Thursday the support system still shows the request waiting, whatever the agent reported or didn’t. A case comes to your attention.</li>
+          <li>On Thursday the responsibility’s next run finds the request still waiting in the support system, whatever the agent reported or didn’t. A case comes to your attention.</li>
           <li>You reply and raise the agent’s budget. The support system records your reply, and the case closes.</li>
         </ol>
         <p class="story-close">You didn’t have to read every reply to catch this. That gives you a basis for handing over more, step by step, and improving the agent as you go.</p>
@@ -106,22 +124,23 @@
         <div class="section-head">
           <p class="eyebrow">04 · Architecture</p>
           <h2 id="architecture-title" class="stacked"><span>Observe deterministically.</span> <span>Judge probabilistically.</span> <span>Remember persistently.</span></h2>
+          <p>No fixed workflow, no dashboard to watch. In each run, the agent evaluates new evidence against the lasting expectation and everything known so far. Nothing has to run in between, and the next run needn’t be the same agent.</p>
         </div>
         <ol class="flow" role="list">
           <li>
             <h3>Observe</h3>
-            <p>Signals run the same queries against the systems of record, every time.</p>
-            <p class="tag">Signals</p>
+            <p>Signals run the same queries against the systems of record, every time. What they find is kept as evidence, and relevant new evidence can start the next run.</p>
+            <p class="tag">Evidence</p>
           </li>
           <li>
             <h3>Judge</h3>
-            <p>A model reads the facts against the expectations and proposes cases with their evidence. Code checks what can be checked exactly.</p>
-            <p class="tag">AI + rules</p>
+            <p>The agent evaluates new evidence against the expectation and its history, decides what matters, and determines what to do next. It can act through its host’s tools, involve another agent or a person, or decide that no action is needed.</p>
+            <p class="tag">Decisions</p>
           </li>
           <li>
             <h3>Remember</h3>
-            <p>Cases keep their history across runs, so each judgment starts from what is already known.</p>
-            <p class="tag">Persistent cases</p>
+            <p>The responsibility, its cases, the evidence they rest on and every decision carry over, so each judgment starts from what is already known.</p>
+            <p class="tag">Context</p>
           </li>
         </ol>
       </div>
@@ -132,16 +151,16 @@
         <div class="section-head">
           <p class="eyebrow">05 · Built for developers</p>
           <h2 id="developers-title">Four functions. One responsibility lifecycle.</h2>
-          <p>Responsibilities Core is the decision step in that loop, as four pure functions over plain JSON: deterministic TypeScript with no runtime dependencies. The same inputs give byte-identical outputs. It loads, stores, schedules, calls models and executes nothing, and has no clock: your code supplies the time.</p>
+          <p>Responsibilities Core is the open-source core of this concept. It is the decision step of each run, as four pure functions over plain JSON: deterministic TypeScript with no runtime dependencies. The same inputs give byte-identical outputs. It loads, stores, schedules, calls models and executes nothing, and has no clock: your code supplies the time. Your host handles scheduling, models, tools and persistence.</p>
         </div>
         <dl class="functions">
           <div class="card">
             <dt><code>view</code></dt>
-            <dd>What is going on? Prepares what the LLM sees: the observations, the cases, the expectations and the kinds of attention a case can need.</dd>
+            <dd>What is going on? Prepares what the agent sees: the observations, the cases, the expectations and the kinds of attention a case can need.</dd>
           </div>
           <div class="card">
             <dt><code>step</code></dt>
-            <dd>Does the proposal hold? Checks the LLM’s proposals and returns the transitions, the new state and the Attentions to deliver.</dd>
+            <dd>Does the proposal hold? Checks the agent’s proposals and returns the transitions, the new state and the Attentions to deliver.</dd>
           </div>
           <div class="card">
             <dt><code>command</code></dt>
@@ -152,6 +171,7 @@
             <dd>Was it a success? Checks a case against its success criteria: met, not met or unknown. Closed is not success.</dd>
           </div>
         </dl>
+        <p class="proof">See it run: in the simulation, Claude Code and Codex each judge one responsibility for six days — one fresh run a day, with no memory of their own. Each run starts from the responsibility’s state and the evidence so far, and that is enough. They open the case, hold back for three days, call in the support lead on day five when nothing has moved, and close that attention on day six once work resumes, leaving the case open. <a href="https://github.com/vicox/responsibilities/blob/main/docs/simulation.md">How the simulation works <span aria-hidden="true">→</span></a></p>
         <p class="more"><a href="https://github.com/vicox/responsibilities#readme">Read the README on GitHub <span aria-hidden="true">→</span></a></p>
       </div>
     </section>
@@ -161,8 +181,8 @@
         <div class="section-head">
           <p class="eyebrow">06 · Accountability</p>
           <h2 id="accountability-title">Delegating the work does not automatically transfer accountability.</h2>
-          <p>People define what should be true and what agents and automations may do on their own. Accountability can change hands through an explicit handover. Every case can be checked against the facts behind it.</p>
-          <p>It follows states in the world and runs alongside the work. Its view is only as current and complete as its observations. Steps that can’t be undone still need safeguards before they happen.</p>
+          <p>An agent can own a responsibility day to day; a person still answers for it. People define what should be true and what agents and automations may do on their own. Accountability can change hands through an explicit handover. Every case can be checked against the facts behind it.</p>
+          <p>A responsibility follows states in the world. Its view is only as current and complete as its observations. An agent acts only with the tools and permissions its host gives it, and steps that can’t be undone still need safeguards before they happen.</p>
         </div>
       </div>
     </section>
@@ -170,7 +190,7 @@
 
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <p><span class="brand-text">responsibilities.dev</span> · The responsibility layer.</p>
+      <p><span class="brand-text">responsibilities.dev</span> · Persistent Responsibilities for AI Agents</p>
       <a href="impressum.html">Impressum</a>
     </div>
   </footer>
