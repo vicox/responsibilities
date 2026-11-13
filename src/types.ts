@@ -43,7 +43,10 @@ export interface Criterion {
   any_of?: { rules: Rule[] }[];
 }
 
-/** A kind of Attention a Case can need: a person or team should look at it. */
+/**
+ * A kind of Attention a Case can need: action is needed in the case. It is neither the action nor
+ * a message: the core records it and, for a routed type, returns a delivery; who acts is the host's.
+ */
 export interface AttentionType {
   key: string;
   description: string;
@@ -178,10 +181,27 @@ export interface View {
   spec: string;
   basis: Hash;
   observations: Observation[];
-  /** Every Case, open or not, by case_id. */
-  cases: { case_id: Hash; subject: Subject; status: Status; episode: number; title: string | null; attentions: string[] }[];
+  /** Every Case, open or not, by case_id: its current record and its earlier assessments. */
+  cases: {
+    case_id: Hash;
+    subject: Subject;
+    status: Status;
+    episode: number;
+    /** Earlier assessment by a judge, recorded in an earlier run: history, not evidence and not current truth. */
+    title: string | null;
+    /** Earlier assessment by a judge, recorded in an earlier run: history, not evidence and not current truth. */
+    summary: string | null;
+    /** Ids of the observations the case rests on, sorted; also ids not passed to this call, which are context only and cannot be cited. */
+    evidence: string[];
+    /** `occurred_at` of the earliest observation linked to the case. */
+    first_observed: Time;
+    /** `occurred_at` of the latest observation linked to the case. */
+    last_observed: Time;
+    attentions: string[];
+  }[];
   /** The declared types; whether a check gates an opening and whether one is delivered, never the rules. */
   attention_types: { key: string; description: string; checked: boolean; routed: boolean }[];
+  /** Earlier proposals by a judge, for a person to decide on: history, not evidence. */
   improvements: { key: string; title: string; change: string }[];
   closing: string[];
   expectations?: string;
@@ -241,7 +261,7 @@ export interface AttentionEvent {
   at: Time;
 }
 
-/** One opening or reopening of a routed Attention type: what the host delivers. */
+/** One opening or reopening of a routed Attention type: what the host hands to the route, a person, a team or an agent. */
 export interface Delivery {
   /** `H([case_id, type, activation])`: the dedupe key, stable across replays. */
   id: Hash;

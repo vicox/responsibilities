@@ -18,7 +18,7 @@ There is no other option: no replay judge on the command line, no resume, no sto
 Each day's observations arrive at 09:00Z and the judge answers at 18:00Z. Every day, `view` and `step` get **every observation from D1 through that day**, so the closing and `when` rules can read an earlier day's facts.
 
 1. The day's observations join the earlier ones, and each is journaled as a `signal`.
-2. `view`, then the prompt: the View rendered as text with general rules only (`simulation/prompt.ts`). It names nothing of the scenario and shows no rule, only each attention type's description and whether it is checked and routed.
+2. `view`, then the prompt: the View rendered as text with general rules only (`simulation/prompt.ts`). It names nothing of the scenario and shows no rule, only each attention type's description and whether it is checked and routed. The README asks a host to mark earlier assessments as such; this prompt lists each case's title, an earlier assessment by the judge, without that mark, and is left as it is so that the live results below stay comparable.
 3. The judge answers in the structured format of `simulation/judge-schema.json`.
 4. `simulation/parse.ts` maps the answer to an `Evaluation` and validates it with the core's schema. An answer that cannot be used gets one retry, with the error. If that fails too, the day is `judge_failed`: `step` is not called, the state stays as it was, and the day shows FAILED. There is no scripted fallback.
 5. `step`, then each delivery is written to the inbox.

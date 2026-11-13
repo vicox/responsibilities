@@ -1,12 +1,12 @@
 // Runs the README example against the recording library, checks what its comments
 // claim, and compares the recording with fixtures/example.json.
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { digest } from "../src/index.ts";
+import { digest, view } from "../src/index.ts";
 import type { Assessment, StepResult, View } from "../src/index.ts";
 import { matchFixture } from "./fixture.ts";
 import { calls } from "./recorder.ts";
@@ -26,14 +26,32 @@ ${block}
   writeFileSync(file, source);
   const { host } = await import(pathToFileURL(file).href);
   const { at, definition, openList, propose, attention } = await import("./helpers.ts");
-  const committed: { readDigest: string; record: { outbox: unknown[]; state_digest: string } }[] = [];
+  type Record = { outbox: unknown[]; state_digest: string; evaluation: { basis: string; proposals: unknown[] }; rejections: unknown[] };
+  const committed: { readDigest: string; record: Record }[] = [];
+  const observations = [openList("open-1", 2, [173])];
+  const proposals = [propose(173, "open", ["open-1"], { attentions: [attention("needs_owner", "open")] })];
   await host({
-    definition, state: null, observations: [openList("open-1", 2, [173])], now: at(2, 1), readDigest: digest(null),
-    askYourLLM: async () => ({ proposals: [propose(173, "open", ["open-1"], { attentions: [attention("needs_owner", "open")] })] }),
-    yourStore: { commitIf: async (readDigest: string, record: { outbox: unknown[]; state_digest: string }) => committed.push({ readDigest, record }) },
+    definition, state: null, observations, now: at(2, 1), readDigest: digest(null),
+    askYourLLM: async () => ({ proposals }),
+    yourStore: { commitIf: async (readDigest: string, record: Record) => committed.push({ readDigest, record }) },
   });
   assert.equal(committed.length, 1);
-  assert.equal(committed[0]!.record.outbox.length, 1, "the delivery is in the outbox");
+  const { record } = committed[0]!;
+  assert.equal(record.outbox.length, 1, "the delivery is in the outbox");
+  assert.equal(record.evaluation.basis, view(definition, null, observations, at(2, 1)).basis, "the evaluation step was given is kept");
+  assert.deepEqual(record.evaluation.proposals, proposals);
+  assert.deepEqual(record.rejections, [], "the rejections are kept with it");
+});
+
+test("the README carries the site's claim and none of its retired wording", () => {
+  assert.ok(readFileSync(join(root, "README.md"), "utf8").includes("Persistent Responsibilities for AI Agents"));
+  const files = ["README.md", "docs/reference.md", ...readdirSync(join(root, "src")).map((name) => `src/${name}`)];
+  for (const file of files) {
+    const text = readFileSync(join(root, file), "utf8");
+    for (const phrase of ["The responsibility layer", "For human, agent, and automated work", "Responsibilities decides", "a person or team should look at"]) {
+      assert.ok(!text.includes(phrase), `${file} still says: ${phrase}`);
+    }
+  }
 });
 
 test("the README example runs, does what it says, and is the fixture", async () => {
