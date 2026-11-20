@@ -10,8 +10,8 @@ Design and decisions: [docs/implementation-plan.md](docs/implementation-plan.md)
 
 This service lives in `mcp/` of the [responsibilities](../README.md) repository. It is
 a standalone package with its own `package.json` and lockfile, not part of the root
-`responsibilities-core` package and not an npm workspace. Run every command below from
-`mcp/`.
+`responsibilities-core` package and not an npm workspace. Run every `npm` command below
+from `mcp/`; the Vercel CLI runs from the repository root (see Deploy).
 
 ## Shape
 
@@ -115,10 +115,11 @@ Not provisioned by this repository. Rules:
    (app uses Neon's pooled URL). Previews get none and fail closed.
 3. Before every deploy: `npm run check`; before the first deploy and after any locking
    change also `npm run test:pg` against a throwaway Neon branch.
-4. `DATABASE_URL=<direct url> npm run db:migrate`, **then** deploy (`vercel deploy --prod`
-   or Git integration; both build the project's Root Directory `mcp`). Production never
-   migrates from a request. MVP migrations only add; a destructive one follows stop →
-   backup → migrate → deploy.
+4. `DATABASE_URL=<direct url> npm run db:migrate`, **then** deploy: Git integration, or
+   `vercel link` and `vercel deploy --prod` from the repository root, not from `mcp/`
+   (Vercel applies the Root Directory `mcp` itself). Production never migrates from a
+   request. MVP migrations only add; a destructive one follows stop → backup → migrate →
+   deploy.
 5. Create the workspace and members with `npm run admin` against the production URL.
 6. Smoke: both discovery documents answer; unauthenticated `POST /mcp` → 401 with
    `resource_metadata`; Claude Code connects and `get_server_info` names the workspace;
