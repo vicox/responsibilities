@@ -13,6 +13,7 @@ import {
   normaliseFacts,
   normaliseSources,
   Refusal,
+  RUN_IDLE_MS,
   RUN_LIFETIME_MS,
   RUN_LIMIT,
   sameJson,
@@ -189,7 +190,7 @@ const COMPLETED = `('completed', 'partial', 'failed')`;
 
 /**
  * A case is part of the baseline only once a completed run has observed it. A
- * case opened by a run that was then abandoned (superseded or expired) keeps its
+ * case opened by a run that was then abandoned (superseded, idle or expired) keeps its
  * rows, but stays out of open cases, counts, not-observed lists and case
  * history until a completed run observes it. `alias` is the cases alias.
  */
@@ -418,6 +419,7 @@ export function responsibilityStore(
     sources: Source[] | null;
     completed_at: Date | null;
     outcome: string | null;
+    summary: string | null;
     completion: CompleteResult | null;
   };
 
@@ -427,7 +429,7 @@ export function responsibilityStore(
     if (!isUuid(runId)) throw unknown;
     const [run] = await q.query<RunRow>(
       `SELECT id, responsibility_id, version_id, member_id, client_id, started_at, sources,
-              completed_at, outcome, completion
+              completed_at, outcome, summary, completion
          FROM runs WHERE workspace_id = $1 AND id = $2
          FOR UPDATE`,
       [ws, runId],
@@ -447,6 +449,15 @@ export function responsibilityStore(
     return new Date(run.started_at.getTime() + RUN_LIFETIME_MS);
   }
 
+  /**
+   * When the next `start_run` may take the open run over: RUN_IDLE_MS after its
+   * last activity, and never later than its lifetime. Its own writes renew it.
+   */
+  function reclaimableAt(run: { started_at: Date; last_active_at: Date | null }): Date {
+    const idle = (run.last_active_at ?? run.started_at).getTime() + RUN_IDLE_MS;
+    return new Date(Math.min(idle, expiresAt(run).getTime()));
+  }
+
   function refuseIfExpired(run: RunRow, now: Date): void {
     if (now.getTime() >= expiresAt(run).getTime()) {
       throw new Refusal(
@@ -459,9 +470,11 @@ export function responsibilityStore(
 
   function refuseIfAbandoned(run: RunRow): void {
     if (run.outcome === "abandoned") {
-      throw new Refusal("run_abandoned", "This run was abandoned (expired or superseded); start a new run.", {
-        run_id: run.id,
-      });
+      throw new Refusal(
+        "run_abandoned",
+        "This run was abandoned (expired, idle and taken over, or superseded); nothing more is recorded in it.",
+        { run_id: run.id, summary: run.summary },
+      );
     }
   }
 
@@ -596,8 +609,10 @@ export function responsibilityStore(
         const responsibility = await responsibilityByKey(tx, key, true);
         const runId = randomUUID();
 
-        const [open] = await tx.query<{ id: string; started_at: Date }>(
-          `SELECT id, started_at FROM runs
+        // last_active_at comes from the locked row itself: a record_observations
+        // that renewed it and committed while this waited for the lock is seen.
+        const [open] = await tx.query<{ id: string; started_at: Date; last_active_at: Date | null }>(
+          `SELECT id, started_at, last_active_at FROM runs
             WHERE workspace_id = $1 AND responsibility_id = $2 AND completed_at IS NULL
             FOR UPDATE`,
           [ws, responsibility.id],
@@ -609,8 +624,13 @@ export function responsibilityStore(
                 WHERE workspace_id = $1 AND id = $2`,
               [ws, open.id, now, summary],
             );
+          // Who starts makes no difference: one OAuth client (a claude.ai
+          // connector, a Claude Code installation) serves concurrent sessions,
+          // so the same member and client is no evidence the open run is dead.
           if (now.getTime() >= expiresAt(open).getTime()) {
             await abandon("expired: not completed within its 2 h lifetime");
+          } else if (now.getTime() >= reclaimableAt(open).getTime()) {
+            await abandon(`idle: no activity for ${RUN_IDLE_MS / 60_000} min; taken over by run ${runId}`);
           } else if (!supersede) {
             const [summary] = await tx.query<RunSummaryRow>(
               `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs r ${RUN_SUMMARY_JOINS}
@@ -619,8 +639,13 @@ export function responsibilityStore(
             );
             throw new Refusal(
               "run_in_progress",
-              `Another run of ${key} is in progress; report without history, or pass supersede: true only if asked to.`,
-              { run: runSummary(summary), expires_at: iso(expiresAt(open)) },
+              `Another run of ${key} is in progress and active; report without history, or pass supersede: true ` +
+                `only if asked to. A start_run from reclaimable_at takes it over unless it records again.`,
+              {
+                run: runSummary(summary),
+                expires_at: iso(expiresAt(open)),
+                reclaimable_at: iso(reclaimableAt(open)),
+              },
             );
           } else {
             await abandon(`superseded by run ${runId}`);
@@ -629,8 +654,9 @@ export function responsibilityStore(
 
         await tx.query(
           `INSERT INTO runs
-             (workspace_id, id, responsibility_id, version_id, member_id, client_id, client_name, agent, started_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
+             (workspace_id, id, responsibility_id, version_id, member_id, client_id, client_name, agent,
+              started_at, last_active_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $9)`,
           [
             ws,
             runId,
@@ -780,6 +806,12 @@ export function responsibilityStore(
             [ws, run.id, caseIds, stored, now],
           );
         }
+
+        // An accepted call, with or without subjects, keeps the run held (RUN_IDLE_MS).
+        await tx.query(
+          `UPDATE runs SET last_active_at = GREATEST(last_active_at, $3) WHERE workspace_id = $1 AND id = $2`,
+          [ws, run.id, now],
+        );
 
         return {
           run_id: run.id,

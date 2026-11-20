@@ -207,10 +207,12 @@ export function responsibilitiesMcpServer(session: ServerSession): McpServer {
       title: "Start a run",
       description:
         "Starts a run of a responsibility against its current version and returns the baseline: the last " +
-        "completed run and every open case with its facts. One run per responsibility at a time: refused " +
-        "run_in_progress while another is open (2 h lifetime); supersede: true abandons it — only when " +
-        "the person asked for that. Observe every open case returned as well as everything your sources " +
-        "return." +
+        "completed run and every open case with its facts. One run per responsibility at a time (2 h " +
+        "lifetime). An open run is held while active: start_run and every accepted record_observations " +
+        "renew it for 10 min. Refused run_in_progress while another run is held; once it has been idle " +
+        "10 min, start_run abandons it and starts, so a run whose agent stopped does not block the next. " +
+        "supersede: true abandons a held run — only when the person asked for that. Observe every open " +
+        "case returned as well as everything your sources return." +
         DATA_RULES,
       inputSchema: z.object({
         responsibility: responsibilityKey,
@@ -234,7 +236,8 @@ export function responsibilitiesMcpServer(session: ServerSession): McpServer {
         "source-only call with no subjects is valid. Facts are a flat map: key ^[a-z][a-z0-9_]*(\\.seg){0,3}, " +
         "value string / number / boolean / null / string[]. null = unknown; an absent key = the covering " +
         "source was read completely and did not carry it. Keys absent now whose group no complete source " +
-        "covers are kept as null. Recording a subject again in the same run replaces its facts." +
+        "covers are kept as null. Recording a subject again in the same run replaces its facts. Each " +
+        "accepted call keeps the run held for another 10 min (see start_run)." +
         DATA_RULES,
       inputSchema: z.object({
         run_id: runId,

@@ -5,7 +5,7 @@ import type { SqlDriver } from "../db/driver.ts";
 import { pgSchema, pgSkip } from "../pg-testing.ts";
 import { migrateAll, seedMembers } from "../testing.ts";
 import { AGENT_A, DEFINITION, SOURCES } from "./fixtures.ts";
-import { Refusal } from "./model.ts";
+import { Refusal, RUN_IDLE_MS } from "./model.ts";
 import { responsibilityStore } from "./store.ts";
 
 /**
@@ -20,14 +20,18 @@ async function setup() {
   const { drivers, drop } = await pgSchema(3);
   await migrateAll(drivers[0]);
   const { workspaceId, members } = await seedMembers(drivers[0], ["alice", "bob"], "acme");
-  const storeOn = (index: number, member: string, client: string) =>
-    responsibilityStore(drivers[index], {
-      workspaceId,
-      memberId: members[member],
-      clientId: client,
-      clientName: client,
-    });
-  return { drivers, drop, storeOn };
+  const storeOn = (index: number, member: string, client: string, now?: () => Date) =>
+    responsibilityStore(
+      drivers[index],
+      {
+        workspaceId,
+        memberId: members[member],
+        clientId: client,
+        clientName: client,
+      },
+      { now },
+    );
+  return { drivers, drop, storeOn, workspaceId };
 }
 
 function code(result: PromiseSettledResult<unknown>): string {
@@ -103,6 +107,81 @@ test(
         ]);
         assert.equal(code(started), "ok", `round ${round}: ${code(started)}`);
         assert.ok(["ok", "run_abandoned"].includes(code(recorded)), `round ${round}: ${code(recorded)}`);
+      }
+    } finally {
+      await drop();
+    }
+  },
+);
+
+test(
+  "start_run taking over an idle run and its owner's renewing write: exactly one of them lands",
+  { skip: pgSkip },
+  async () => {
+    const { drivers, drop, storeOn, workspaceId } = await setup();
+    try {
+      let current = new Date("2026-11-19T09:00:00.000Z");
+      const now = () => new Date(current);
+      const alice = storeOn(0, "alice", "client-a", now);
+      const bob = storeOn(1, "bob", "client-b", now);
+      const start = (key: string) => bob.startRun({ responsibility: key, agent: AGENT_A, supersede: false });
+
+      // Pinned interleaving: the owner's write holds the run lock and renews
+      // last_active_at as record_observations does; a takeover arriving in
+      // between waits for the lock and must judge the renewed row, not the idle one.
+      await alice.putResponsibility({ ...DEFINITION, key: "idle-pinned" });
+      const pinned = await alice.startRun({ responsibility: "idle-pinned", agent: AGENT_A, supersede: false });
+      current = new Date(current.getTime() + RUN_IDLE_MS);
+      let taking: Promise<PromiseSettledResult<unknown>> | undefined;
+      await drivers[0].transaction(async (tx) => {
+        await tx.query(`SELECT id FROM runs WHERE workspace_id = $1 AND id = $2 FOR UPDATE`, [
+          workspaceId,
+          pinned.run_id,
+        ]);
+        taking = start("idle-pinned").then(
+          (value) => ({ status: "fulfilled" as const, value }),
+          (reason: unknown) => ({ status: "rejected" as const, reason }),
+        );
+        await untilSomeoneWaitsOnALock(drivers[2]);
+        await tx.query(
+          `UPDATE runs SET last_active_at = GREATEST(last_active_at, $3) WHERE workspace_id = $1 AND id = $2`,
+          [workspaceId, pinned.run_id, now()],
+        );
+      });
+      assert.equal(code(await taking!), "run_in_progress", "the takeover saw the renewal it waited for");
+
+      // And the real functions, raced on a run idle for exactly RUN_IDLE_MS.
+      for (let round = 0; round < ROUNDS; round++) {
+        const key = `idle-${round}`;
+        await alice.putResponsibility({ ...DEFINITION, key });
+        const { run_id } = await alice.startRun({ responsibility: key, agent: AGENT_A, supersede: false });
+        await alice.recordObservations({ run_id, sources: SOURCES, subjects: [] });
+        current = new Date(current.getTime() + RUN_IDLE_MS);
+
+        const subject = `I${round}`;
+        const [recorded, started] = await Promise.allSettled([
+          alice.recordObservations({ run_id, subjects: [{ subject, facts: { "bugcrowd.state": "NEW" } }] }),
+          start(key),
+        ]);
+        const outcome = `${code(recorded)} / ${code(started)}`;
+        assert.ok(
+          ["ok / run_in_progress", "run_abandoned / ok"].includes(outcome),
+          `round ${round}: ${outcome}`,
+        );
+        const [run] = await drivers[0].query<{ outcome: string | null }>(`SELECT outcome FROM runs WHERE id = $1`, [
+          run_id,
+        ]);
+        const observed = await drivers[0].query(
+          `SELECT 1 FROM observations o JOIN cases c ON c.id = o.case_id WHERE o.run_id = $1 AND c.subject = $2`,
+          [run_id, subject],
+        );
+        if (recorded.status === "fulfilled") {
+          assert.equal(run.outcome, null, "the write renewed it: still open");
+          assert.equal(observed.length, 1);
+        } else {
+          assert.equal(run.outcome, "abandoned");
+          assert.equal(observed.length, 0, "refused writes nothing");
+        }
       }
     } finally {
       await drop();

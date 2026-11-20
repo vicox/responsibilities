@@ -3,10 +3,22 @@ import test from "node:test";
 
 import { seedMembers } from "../testing.ts";
 import { AGENT_A, AGENT_B, DEFINITION, refusal, SOURCES, VOCABULARY, world } from "./fixtures.ts";
-import { RUN_LIFETIME_MS, RUN_LIMIT } from "./model.ts";
+import { Refusal, RUN_IDLE_MS, RUN_LIFETIME_MS, RUN_LIMIT } from "./model.ts";
 import { responsibilityStore } from "./store.ts";
 
-const HOUR = 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+/** The refusal a promise rejects with, as its JSON. */
+async function refusalDetail(promise: Promise<unknown>): Promise<Record<string, unknown>> {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof Refusal) return error.toJSON();
+    throw error;
+  }
+  throw new Error("expected a refusal, got a result");
+}
 
 test("versioning: same content is a no-op, a change adds a version", async () => {
   const w = await world();
@@ -66,8 +78,8 @@ test("one open run per responsibility: run_in_progress, expiry abandons, superse
       "run_in_progress",
     );
 
-    // Superseded: the old run is abandoned and cannot be written to.
-    w.advance(10 * 60 * 1000);
+    // Superseded while still held: the old run is abandoned and cannot be written to.
+    w.advance(5 * MINUTE);
     const second = await bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: true });
     const [old] = await w.db.query<{ outcome: string; summary: string }>(
       `SELECT outcome, summary FROM runs WHERE id = $1`,
@@ -99,6 +111,188 @@ test("one open run per responsibility: run_in_progress, expiry abandons, superse
       await refusal(alice.startRun({ responsibility: "unknown-key", agent: AGENT_A, supersede: false })),
       "unknown_responsibility",
     );
+  } finally {
+    await w.close();
+  }
+});
+
+test("an open run is held while active, whoever asks, and taken over by the next start_run once idle", async () => {
+  const w = await world();
+  try {
+    const alice = w.storeFor("alice", "client-a");
+    // Another session of the same member on the same OAuth client — one claude.ai
+    // connector or one Claude Code installation serves concurrent sessions.
+    const aliceElsewhere = w.storeFor("alice", "client-a");
+    const bob = w.storeFor("bob", "client-b");
+    const start = (store: typeof alice) =>
+      store.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false });
+    await alice.putResponsibility(DEFINITION);
+
+    const done = await start(alice);
+    await alice.recordObservations({
+      run_id: done.run_id,
+      sources: SOURCES,
+      subjects: [{ subject: "S1", facts: { "bugcrowd.state": "NEW" } }],
+    });
+    await alice.completeRun({
+      run_id: done.run_id,
+      outcome: "completed",
+      decisions: [{ subject: "S1", assessment: "nothing_due", attention: null, basis: "b" }],
+    });
+    w.advance(HOUR);
+
+    // Held for RUN_IDLE_MS from start_run, for the same member and client as for anyone else.
+    const run = await start(alice);
+    const startedAt = w.now().getTime();
+    w.advance(RUN_IDLE_MS - 1);
+    for (const other of [aliceElsewhere, bob]) {
+      const refused = await refusalDetail(start(other));
+      assert.equal(refused.error, "run_in_progress");
+      assert.equal(refused.reclaimable_at, new Date(startedAt + RUN_IDLE_MS).toISOString());
+      assert.equal(refused.expires_at, run.expires_at);
+    }
+
+    // Every accepted record_observations renews the hold, one without subjects too.
+    await alice.recordObservations({
+      run_id: run.run_id,
+      sources: SOURCES,
+      subjects: [{ subject: "S2", facts: { "bugcrowd.state": "NEW" } }],
+    });
+    const renewedAt = w.now().getTime();
+    w.advance(RUN_IDLE_MS - 1);
+    assert.equal(
+      (await refusalDetail(start(bob))).reclaimable_at,
+      new Date(renewedAt + RUN_IDLE_MS).toISOString(),
+    );
+    await alice.recordObservations({ run_id: run.run_id, subjects: [] });
+    w.advance(RUN_IDLE_MS - 1);
+    assert.equal(await refusal(start(bob)), "run_in_progress");
+
+    // Idle, but nobody started: it is still open, and its owner goes on writing.
+    w.advance(2 * RUN_IDLE_MS);
+    assert.equal((await alice.getResponsibility(DEFINITION.key, false)).in_progress?.run_id, run.run_id);
+    await alice.recordObservations({
+      run_id: run.run_id,
+      subjects: [{ subject: "S3", facts: { "bugcrowd.state": "NEW" } }],
+    });
+    assert.equal(await refusal(start(bob)), "run_in_progress", "and that write holds it again");
+
+    // A refused write is no activity: it writes nothing.
+    w.advance(RUN_IDLE_MS - 1);
+    assert.equal(
+      await refusal(
+        alice.recordObservations({ run_id: run.run_id, subjects: [{ subject: "S4", facts: { "Bad Key": 1 } }] }),
+      ),
+      "invalid_fact",
+    );
+    w.advance(1);
+
+    // Idle for RUN_IDLE_MS: the next start_run takes it over without supersede.
+    const next = await start(bob);
+    const [old] = await w.db.query<{ outcome: string; summary: string }>(
+      `SELECT outcome, summary FROM runs WHERE id = $1`,
+      [run.run_id],
+    );
+    assert.deepEqual(old, {
+      outcome: "abandoned",
+      summary: `idle: no activity for 10 min; taken over by run ${next.run_id}`,
+    });
+    assert.equal(next.last_run?.run_id, done.run_id, "the baseline is the last completed run");
+    assert.deepEqual(next.open_cases.map((c) => c.subject), ["S1"], "nothing of the taken-over run");
+
+    // Its owner learns why on the next write; what it recorded is kept.
+    const abandoned = await refusalDetail(alice.recordObservations({ run_id: run.run_id, subjects: [] }));
+    assert.equal(abandoned.error, "run_abandoned");
+    assert.equal(abandoned.summary, old.summary);
+    assert.equal(
+      await refusal(alice.completeRun({ run_id: run.run_id, outcome: "completed", decisions: [] })),
+      "run_abandoned",
+    );
+    const [{ count }] = await w.db.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM observations WHERE run_id = $1`,
+      [run.run_id],
+    );
+    assert.equal(count, 2);
+  } finally {
+    await w.close();
+  }
+});
+
+test("an idle run nobody took over still completes", async () => {
+  const w = await world();
+  try {
+    const alice = w.storeFor("alice");
+    await alice.putResponsibility(DEFINITION);
+    const run = await alice.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false });
+    await alice.recordObservations({
+      run_id: run.run_id,
+      sources: SOURCES,
+      subjects: [{ subject: "S1", facts: { "bugcrowd.state": "NEW" } }],
+    });
+    w.advance(3 * RUN_IDLE_MS);
+    const done = await alice.completeRun({
+      run_id: run.run_id,
+      outcome: "completed",
+      decisions: [{ subject: "S1", assessment: "nothing_due", attention: null, basis: "b" }],
+    });
+    assert.equal(done.outcome, "completed");
+    assert.equal((await alice.getResponsibility(DEFINITION.key, false)).last_run?.run_id, run.run_id);
+  } finally {
+    await w.close();
+  }
+});
+
+test("activity never extends the 2 h lifetime", async () => {
+  const w = await world();
+  try {
+    const alice = w.storeFor("alice");
+    const bob = w.storeFor("bob", "client-b");
+    await alice.putResponsibility(DEFINITION);
+    const run = await alice.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false });
+    await alice.recordObservations({ run_id: run.run_id, sources: SOURCES, subjects: [] });
+    for (let elapsed = 5 * MINUTE; elapsed < RUN_LIFETIME_MS; elapsed += 5 * MINUTE) {
+      w.advance(5 * MINUTE);
+      await alice.recordObservations({ run_id: run.run_id, subjects: [] });
+    }
+
+    const refused = await refusalDetail(
+      bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false }),
+    );
+    assert.equal(refused.error, "run_in_progress");
+    assert.equal(refused.reclaimable_at, run.expires_at, "held at most until its lifetime ends");
+
+    w.advance(5 * MINUTE);
+    assert.equal(await refusal(alice.recordObservations({ run_id: run.run_id, subjects: [] })), "run_expired");
+    await bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false });
+    const [old] = await w.db.query<{ summary: string }>(`SELECT summary FROM runs WHERE id = $1`, [run.run_id]);
+    assert.equal(old.summary, "expired: not completed within its 2 h lifetime");
+  } finally {
+    await w.close();
+  }
+});
+
+test("a run from before last_active_at existed is held from its start, and its writes renew it", async () => {
+  const w = await world();
+  try {
+    const alice = w.storeFor("alice");
+    const bob = w.storeFor("bob", "client-b");
+    const start = () => bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false });
+    await alice.putResponsibility(DEFINITION);
+    const run = await alice.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false });
+    await w.db.query(`UPDATE runs SET last_active_at = NULL WHERE id = $1`, [run.run_id]);
+
+    w.advance(RUN_IDLE_MS - 1);
+    assert.equal(
+      (await refusalDetail(start())).reclaimable_at,
+      new Date(new Date(run.started_at).getTime() + RUN_IDLE_MS).toISOString(),
+    );
+    await alice.recordObservations({ run_id: run.run_id, sources: SOURCES, subjects: [] });
+    w.advance(RUN_IDLE_MS - 1);
+    assert.equal(await refusal(start()), "run_in_progress");
+    w.advance(1);
+    await start();
+    const [old] = await w.db.query<{ outcome: string }>(`SELECT outcome FROM runs WHERE id = $1`, [run.run_id]);
+    assert.equal(old.outcome, "abandoned");
   } finally {
     await w.close();
   }

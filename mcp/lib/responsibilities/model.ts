@@ -10,6 +10,13 @@ import { createHash } from "node:crypto";
 // --- limits (§5.4) -----------------------------------------------------------
 
 export const RUN_LIFETIME_MS = 2 * 60 * 60 * 1000;
+/**
+ * How long an open run holds its responsibility without activity (§5.1): a run
+ * that has not started or recorded for this long is taken over by the next
+ * `start_run`, so an agent that died does not block the next one for the rest
+ * of the lifetime. Until then its owner may go on writing to it.
+ */
+export const RUN_IDLE_MS = 10 * 60 * 1000;
 export const RUN_LIMIT = 1000;
 export const MAX_SUBJECTS_PER_CALL = 200;
 export const MAX_DECISIONS = 1000;

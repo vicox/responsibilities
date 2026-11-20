@@ -28,7 +28,7 @@ from `mcp/`; the Vercel CLI runs from the repository root (see Deploy).
 | `get_server_info` | workspace, member and client of this session |
 | `put_responsibility` | define or version a responsibility (expectation, subject type, assessment vocabulary) |
 | `get_responsibility` | current version, last completed run, run in progress, open cases |
-| `start_run` | start a run (one open per responsibility, 2 h lifetime) and get the baseline |
+| `start_run` | start a run (one open per responsibility, 2 h lifetime; one idle 10 min is taken over) and get the baseline |
 | `record_observations` | facts per subject (≤ 200/call, ≤ 1000/run); returns the diff to the previous observation |
 | `complete_run` | decisions per subject; updates cases and attention atomically; replayable |
 | `get_case` | one case's history over completed runs |
