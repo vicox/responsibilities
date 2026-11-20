@@ -9,7 +9,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = "https://responsibilities.dev/"
-PAGES = {"index.html": SITE, "impressum.html": SITE + "impressum.html"}  # page: canonical
+PAGES = {  # page: canonical
+    "index.html": SITE,
+    "impressum.html": SITE + "impressum.html",
+    "privacy.html": SITE + "privacy.html",
+    "terms.html": SITE + "terms.html",
+}
+LEGAL_LINKS = ("privacy.html", "terms.html", "impressum.html")  # in every footer, in this order
 README = "https://github.com/vicox/responsibilities#readme"  # the external links: the README
 SIMULATION = "https://github.com/vicox/responsibilities/blob/main/docs/simulation.md"  # and the simulation
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
@@ -119,8 +125,14 @@ for name, canonical in PAGES.items():
     for prev, cur in zip(page.headings, page.headings[1:]):
         check(cur <= prev + 1, f"{name}: heading level jumps from h{prev} to h{cur}")
 
-    # Every page links to the Impressum
-    check(any(url == "impressum.html" for _, _, url in page.links), f"{name}: no link to impressum.html")
+    # Every footer links the Privacy Policy, the Terms of Service and the Impressum, in that order,
+    # and marks the page it is on
+    footer = re.search(r'<footer class="site-footer">(.*?)</footer>', html, re.S)
+    footer_links = re.findall(r'<a href="([^"]+)"( aria-current="page")?>', footer.group(1)) if footer else []
+    check([url for url, _ in footer_links] == list(LEGAL_LINKS),
+          f"{name}: the footer must link {', '.join(LEGAL_LINKS)}, in that order")
+    check([url for url, current in footer_links if current] == ([name] if name in LEGAL_LINKS else []),
+          f"{name}: the footer must mark this page, and only this page, as current")
 
     # Links: local URLs are relative, exist and, with a fragment, point at an id that exists;
     # the only absolute URLs are mailto:, the page's own canonical, the README and the
@@ -319,6 +331,31 @@ for phrase in (
     'href="mailto:georg.schmidl@vicox.net"',
 ):
     check(phrase in html, f"impressum.html: missing text: {phrase}")
+
+# The Privacy Policy and the Terms of Service: dated, naming the operator of the Impressum, with
+# info@ for legal and privacy matters and support@ for help with the service
+IMPRESSUM = pages["impressum.html"][0]
+for name in ("privacy.html", "terms.html"):
+    html, page = pages[name]
+    check(re.search(r'Last updated <time datetime="\d{4}-\d{2}-\d{2}">', html), f"{name}: no last-updated date")
+    check("Georg Schmidl" in html and "Georg Schmidl" in IMPRESSUM, f"{name}: must name the operator of the Impressum")
+    for address in ("info@responsibilities.dev", "support@responsibilities.dev"):
+        check(f'href="mailto:{address}"' in html, f"{name}: no mailto: link to {address}")
+    mailto = set(re.findall(r'href="mailto:([^"]+)"', html))
+    check(mailto <= {"info@responsibilities.dev", "support@responsibilities.dev"}, f"{name}: other contacts: {mailto}")
+html, page = pages["privacy.html"]
+check("<address>" in html and all(line in IMPRESSUM for line in re.findall(r"^\s*(.+?)<br>$", html, re.M)),
+      "privacy.html: the controller's address must be the Impressum's")
+for phrase in (
+    "<code>openid</code> and <code>email</code>, not <code>profile</code>",  # the Google scopes the service asks for
+    "Google", "Vercel", "Neon", "GitHub",  # the providers
+    "Art. 77 GDPR",
+    'href="#retention"',
+):
+    check(phrase in html, f"privacy.html: missing text: {phrase}")
+html, page = pages["terms.html"]
+for phrase in ('href="privacy.html"', "Liability is governed by the statutory provisions.", "German law applies."):
+    check(phrase in html, f"terms.html: missing text: {phrase}")
 
 # CSS: nothing external, balanced braces, every var() defined, and WCAG AA contrast in both
 # colour schemes

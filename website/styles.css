@@ -453,7 +453,7 @@ h3 {
   }
 }
 
-/* Impressum */
+/* Legal pages: Impressum, Privacy Policy, Terms of Service */
 
 .legal {
   display: block;
@@ -470,10 +470,25 @@ h3 {
   letter-spacing: -0.01em;
 }
 
+.legal p,
+.legal ul,
+.legal address {
+  max-width: var(--measure);
+}
+
 .legal address,
-.legal h2 + p {
+.legal h2 + p,
+.legal h2 + ul {
   margin: 0.75rem 0 0;
   font-style: normal;
+}
+
+.legal ul {
+  padding-left: 1.25rem;
+}
+
+.legal li + li {
+  margin-top: 0.5rem;
 }
 
 /* Footer */
@@ -494,6 +509,15 @@ h3 {
 
 .site-footer p {
   margin: 0;
+}
+
+.site-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 @media print {
