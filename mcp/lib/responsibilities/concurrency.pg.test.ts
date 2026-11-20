@@ -39,17 +39,17 @@ function code(result: PromiseSettledResult<unknown>): string {
   return result.reason instanceof Refusal ? result.reason.code : `error: ${String(result.reason)}`;
 }
 
-/** Resolves once some session in this database is waiting on a lock. */
-async function untilSomeoneWaitsOnALock(watcher: SqlDriver): Promise<void> {
+/** Resolves once `sessions` sessions in this database are waiting on a lock. */
+async function untilSomeoneWaitsOnALock(watcher: SqlDriver, sessions = 1): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt++) {
     const [{ waiting }] = await watcher.query<{ waiting: number }>(
       `SELECT count(*)::int AS waiting FROM pg_stat_activity
         WHERE datname = current_database() AND wait_event_type = 'Lock'`,
     );
-    if (waiting > 0) return;
+    if (waiting >= sessions) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
-  throw new Error("no session started waiting on a lock");
+  throw new Error(`fewer than ${sessions} sessions started waiting on a lock`);
 }
 
 test(
@@ -243,6 +243,69 @@ test("a write or a start that waited for a lock holds the run from when it lands
     await drop();
   }
 });
+
+test(
+  "a write or a start that stalled after taking its locks holds the run from when it lands",
+  { skip: pgSkip },
+  async () => {
+    const { drivers, drop, storeOn } = await setup();
+    const settle = <T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> =>
+      promise.then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (reason: unknown) => ({ status: "rejected" as const, reason }),
+      );
+    try {
+      let current = new Date("2026-11-19T09:00:00.000Z");
+      const now = () => new Date(current);
+      const wait = () => {
+        current = new Date(current.getTime() + RUN_IDLE_MS);
+      };
+      const alice = storeOn(1, "alice", "client-a", now);
+      const bob = storeOn(0, "bob", "client-b", now);
+      const start = (store: typeof alice) =>
+        settle(store.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false }));
+      await alice.putResponsibility(DEFINITION);
+      const { run_id } = await alice.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false });
+      await alice.recordObservations({ run_id, sources: SOURCES, subjects: [] });
+
+      // The owner's write takes the run's lock, then waits RUN_IDLE_MS at its
+      // observations INSERT; a takeover arrives and waits for the run.
+      let recording: Promise<PromiseSettledResult<unknown>> | undefined;
+      let taking: Promise<PromiseSettledResult<unknown>> | undefined;
+      await drivers[2].transaction(async (tx) => {
+        await tx.exec(`LOCK TABLE observations IN SHARE MODE`);
+        recording = settle(
+          alice.recordObservations({ run_id, subjects: [{ subject: "S1", facts: { "bugcrowd.state": "NEW" } }] }),
+        );
+        await untilSomeoneWaitsOnALock(drivers[2], 1);
+        taking = start(bob);
+        await untilSomeoneWaitsOnALock(drivers[2], 2);
+        wait();
+      });
+      assert.equal(code(await recording!), "ok");
+      assert.equal(code(await taking!), "run_in_progress", "the write that landed holds the run");
+      const [run] = await drivers[0].query<{ outcome: string | null }>(`SELECT outcome FROM runs WHERE id = $1`, [
+        run_id,
+      ]);
+      assert.equal(run.outcome, null);
+
+      // A start that judges the run idle once it holds the locks, then waits
+      // RUN_IDLE_MS at its first write to runs before taking it over.
+      wait();
+      let starting: Promise<PromiseSettledResult<unknown>> | undefined;
+      await drivers[2].transaction(async (tx) => {
+        await tx.exec(`LOCK TABLE runs IN SHARE MODE`);
+        starting = start(bob);
+        await untilSomeoneWaitsOnALock(drivers[2], 1);
+        wait();
+      });
+      assert.equal(code(await starting!), "ok");
+      assert.equal(code(await start(alice)), "run_in_progress", "the run it began is not idle at once");
+    } finally {
+      await drop();
+    }
+  },
+);
 
 test("two concurrent start_run calls produce exactly one run", { skip: pgSkip }, async () => {
   const { drivers, drop, storeOn } = await setup();

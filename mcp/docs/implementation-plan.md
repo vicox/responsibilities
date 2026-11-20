@@ -231,9 +231,11 @@ deletes a row and never updates `members.workspace_id` or `members.google_sub` o
   So the baseline a run reads at `start_run` — the last completed run — cannot change before it
   completes, and an agent that died blocks the next one for at most 10 min, with no person
   asked to supersede and nothing running in the background.
-- Activity times are read once the locks are held — in `start_run` after the responsibility
-  row and the open run, in `record_observations` after the run — so a call that waited for a
-  lock neither starts nor renews a hold in the past.
+- `start_run` reads the time once it holds the responsibility row and the open run, so it
+  judges the open run at the time it got them. The hold itself — of a new run, or renewed by
+  `record_observations` — is stamped by the transaction's **last** statement with the time
+  read there, so a call that waited or stalled anywhere in its transaction holds the run from
+  when it lands.
 - A run started before `last_active_at` existed (null) has no known activity: it is held for
   its whole lifetime, as before, until a write gives it an activity time.
 - Who calls `start_run` makes no difference to the hold: one OAuth client (a claude.ai
@@ -590,7 +592,7 @@ behaves exactly as today and the source note says "no history"):
 | `lib/responsibilities/model.test.ts` | fact validation and normalisation; coverage carry-over; the diff table; the transition table incl. reopen with and without attention |
 | `lib/responsibilities/store.test.ts` | versioning (same content no-op, change → +1); one open run, `run_in_progress`, expiry → abandoned, `supersede`; a run is held for 10 min after `start_run` and every accepted `record_observations` (with or without subjects; not after a refused one) against every other session, the same member and client included, and then taken over by the next `start_run` with the baseline of the last completed run; an idle run nobody took over still records and completes; activity never extends the 2 h lifetime; a run with null `last_active_at` is held for its lifetime, however recent its writes, until a write sets it; a write or a start that waited for its transaction holds the run from when it lands; run ownership; `sources_required`, a repeated identical first call (with and without subjects) is a no-op, a differing declaration is `sources_conflict`; source-only call; same-subject retry replaces; the 1 001st distinct subject is `run_too_large` and a `failed` completion with no decisions still succeeds; immutability after completion; `unobserved_subject`; vocabulary refusals against the run's version; `complete_run` atomic and replayed from `completion` (also after a later run and after the lifetime); two workspaces with identical keys and subjects see nothing of each other |
 | `lib/responsibilities/two-runs.test.ts` | store-level scenario: run 1 by agent A; run 2 by a different member and client with one fact changed, one returned `null`, one ticket removed under a complete source, one under an incomplete source (→ `became_unknown`), an array fact going to `null` (omitted `issuelinks`), to `[]` (returned, no link) and to `["FIND-1:?"]` (link without status) as three distinct results, one subject in no source, one new — asserts `last_run`, `changes`, `continued` with run 1's `attention_since`, `opened` for changed attention |
-| `lib/**/*.pg.test.ts` (`npm run test:pg`, needs `TEST_DATABASE_URL`) | on real Postgres with independent connections: two concurrent `start_run` → one run; a takeover of an idle run racing its owner's renewing write → exactly one lands; a write or a start that waited for a lock holds the run from when it lands; `record_observations` racing `complete_run` → lands before or is refused, never after; concurrent first-login binds → one bound; `member:remove` racing refresh → refused or followed by `/mcp` refusal |
+| `lib/**/*.pg.test.ts` (`npm run test:pg`, needs `TEST_DATABASE_URL`) | on real Postgres with independent connections: two concurrent `start_run` → one run; a takeover of an idle run racing its owner's renewing write → exactly one lands; a write or a start that waited for a lock, or stalled after taking it, holds the run from when it lands; `record_observations` racing `complete_run` → lands before or is refused, never after; concurrent first-login binds → one bound; `member:remove` racing refresh → refused or followed by `/mcp` refusal |
 
 The judgment itself is not unit-tested here; it is tested on planted data in §12.A.
 

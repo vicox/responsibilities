@@ -462,6 +462,20 @@ export function responsibilityStore(
     return new Date(Math.min(run.last_active_at.getTime() + RUN_IDLE_MS, expiresAt(run).getTime()));
   }
 
+  /**
+   * Stamps the run's activity. Always the last statement of a transaction that
+   * holds the run (its row lock, or its own uncommitted insert), with the time
+   * read here, after every statement that could wait: a call that stalled
+   * anywhere in its transaction holds the run from when it lands, since a
+   * takeover reads the row only after this commits.
+   */
+  async function renew(q: Q, runId: string): Promise<void> {
+    await q.query(
+      `UPDATE runs SET last_active_at = GREATEST(last_active_at, $3) WHERE workspace_id = $1 AND id = $2`,
+      [ws, runId, clock()],
+    );
+  }
+
   function refuseIfExpired(run: RunRow, now: Date): void {
     if (now.getTime() >= expiresAt(run).getTime()) {
       throw new Refusal(
@@ -621,7 +635,7 @@ export function responsibilityStore(
           [ws, responsibility.id],
         );
         // The time is read once the locks are held, so a start that waited for
-        // them does not begin its own run, and with it its hold, in the past.
+        // them judges the open run, and begins its own, at the time it got them.
         const now = clock();
         if (open) {
           const abandon = (summary: string) =>
@@ -678,6 +692,7 @@ export function responsibilityStore(
 
         const last = await lastCompletedRun(tx, responsibility.id);
         const ctx = await context(tx, responsibility, true, now);
+        await renew(tx, runId);
         return {
           run_id: runId,
           started_at: iso(now),
@@ -699,8 +714,8 @@ export function responsibilityStore(
 
       return driver.transaction(async (tx) => {
         const run = await lockOwnRun(tx, input.run_id);
-        // Read once the run is locked: a write that waited for the lock renews
-        // the hold from when it lands, not from before the wait.
+        // Read once the run is locked, for the lifetime check and the records;
+        // the hold itself is stamped at the very end (renew).
         const now = clock();
         refuseIfAbandoned(run);
         if (run.completion) {
@@ -815,17 +830,10 @@ export function responsibilityStore(
           );
         }
 
+        const notObservedSoFar = await notObserved(tx, run.responsibility_id, run.id);
         // An accepted call, with or without subjects, keeps the run held (RUN_IDLE_MS).
-        await tx.query(
-          `UPDATE runs SET last_active_at = GREATEST(last_active_at, $3) WHERE workspace_id = $1 AND id = $2`,
-          [ws, run.id, now],
-        );
-
-        return {
-          run_id: run.id,
-          subjects,
-          not_observed_so_far: await notObserved(tx, run.responsibility_id, run.id),
-        };
+        await renew(tx, run.id);
+        return { run_id: run.id, subjects, not_observed_so_far: notObservedSoFar };
       });
     },
 
