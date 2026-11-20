@@ -9,13 +9,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = "https://responsibilities.dev/"
+# GitHub Pages serves privacy.html at /privacy as well as at /privacy.html, so the Privacy Policy
+# and the Terms of Service have clean URLs: their canonical links and the links to them have no
+# .html, and the old .html URLs keep serving the same page.
 PAGES = {  # page: canonical
     "index.html": SITE,
     "impressum.html": SITE + "impressum.html",
-    "privacy.html": SITE + "privacy.html",
-    "terms.html": SITE + "terms.html",
+    "privacy.html": SITE + "privacy",
+    "terms.html": SITE + "terms",
 }
-LEGAL_LINKS = ("privacy.html", "terms.html", "impressum.html")  # in every footer, in this order
+LEGAL_LINKS = ("privacy", "terms", "impressum.html")  # in every footer, in this order
 README = "https://github.com/vicox/responsibilities#readme"  # the external links: the README
 SIMULATION = "https://github.com/vicox/responsibilities/blob/main/docs/simulation.md"  # and the simulation
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
@@ -131,7 +134,8 @@ for name, canonical in PAGES.items():
     footer_links = re.findall(r'<a href="([^"]+)"( aria-current="page")?>', footer.group(1)) if footer else []
     check([url for url, _ in footer_links] == list(LEGAL_LINKS),
           f"{name}: the footer must link {', '.join(LEGAL_LINKS)}, in that order")
-    check([url for url, current in footer_links if current] == ([name] if name in LEGAL_LINKS else []),
+    url_path = canonical[len(SITE):]  # privacy.html: privacy
+    check([url for url, current in footer_links if current] == ([url_path] if url_path in LEGAL_LINKS else []),
           f"{name}: the footer must mark this page, and only this page, as current")
 
     # Links: local URLs are relative, exist and, with a fragment, point at an id that exists;
@@ -147,9 +151,12 @@ for name, canonical in PAGES.items():
         path, _, fragment = url.partition("#")
         path = path.split("?")[0]
         check(not path.startswith("/"), f"{name}: root-relative URL breaks on a subpath: {url}")
+        check(path not in ("privacy.html", "terms.html"), f"{name}: link the clean URL, not {url}")
         target = ROOT / (path or name)
         if target.is_dir():
             target = target / "index.html"
+        elif not target.exists() and not target.suffix:
+            target = target.with_suffix(".html")  # as GitHub Pages serves privacy.html at /privacy
         check(target.exists(), f"{name}: missing local file: {url}")
         if fragment:
             linked = pages.get(target.relative_to(ROOT).as_posix())
@@ -354,7 +361,7 @@ for phrase in (
 ):
     check(phrase in html, f"privacy.html: missing text: {phrase}")
 html, page = pages["terms.html"]
-for phrase in ('href="privacy.html"', "Liability is governed by the statutory provisions.", "German law applies."):
+for phrase in ('href="privacy"', "Liability is governed by the statutory provisions.", "German law applies."):
     check(phrase in html, f"terms.html: missing text: {phrase}")
 
 # CSS: nothing external, balanced braces, every var() defined, and WCAG AA contrast in both
@@ -384,6 +391,13 @@ for theme, colours in themes.items():
 # Publishing
 check((ROOT / "CNAME").read_text().strip() == "responsibilities.dev", "CNAME must be responsibilities.dev")
 check((ROOT / ".nojekyll").exists(), ".nojekyll missing")
+# A clean URL is served from its .html file only while no directory of the same name exists: with
+# privacy/, GitHub Pages would redirect /privacy to /privacy/ instead.
+for name, canonical in PAGES.items():
+    url_path = canonical[len(SITE):]
+    if url_path and "." not in url_path:
+        check(name == url_path + ".html" and not (ROOT / url_path).exists(),
+              f"{name}: the clean URL /{url_path} must be served from {url_path}.html, with no {url_path}/ directory")
 
 if failures:
     print("\n".join(f"FAIL {f}" for f in failures))
