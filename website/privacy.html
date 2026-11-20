@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy · responsibilities.dev</title>
+  <meta name="description" content="What responsibilities.dev and the hosted Responsibilities MCP service process about you, why, with which providers, and how to ask for access or deletion.">
+  <link rel="canonical" href="https://responsibilities.dev/privacy.html">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111315" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=d7c99776">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./">responsibilities<span>.dev</span></a>
+      <nav aria-label="Concept">
+        <ul role="list">
+          <li><a href="./#how">How it works</a></li>
+          <li><a href="./#examples">Examples</a></li>
+          <li><a href="./#delegation">Delegation</a></li>
+          <li><a href="./#architecture">Architecture</a></li>
+          <li><a href="./#developers">Developers</a></li>
+          <li><a href="./#accountability">Accountability</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="legal" tabindex="-1">
+    <div class="wrap">
+      <p class="eyebrow">Legal</p>
+      <h1>Privacy Policy</h1>
+      <p class="lede">Last updated <time datetime="2026-11-20">20 November 2026</time>. What this website and the hosted Responsibilities MCP service process about you, why, and what you can ask for.</p>
+
+      <h2 id="controller">Who is responsible</h2>
+      <p>The controller within the meaning of the GDPR is:</p>
+      <address>
+        Georg Schmidl<br>
+        Amberger Str. 20<br>
+        81679 München<br>
+        Germany
+      </address>
+      <p>For questions about this policy or your data, including a request to see or delete it, write to <a href="mailto:info@responsibilities.dev">info@responsibilities.dev</a>. For help using the service, write to <a href="mailto:support@responsibilities.dev">support@responsibilities.dev</a>.</p>
+
+      <h2 id="scope">What this policy covers</h2>
+      <ul>
+        <li>This website, <strong>responsibilities.dev</strong>, which describes the concept.</li>
+        <li>The hosted <strong>Responsibilities MCP service</strong> (“the service”): a remote MCP server that keeps responsibilities, runs, cases and decisions for AI agents, together with the sign-in through which MCP clients are connected to it.</li>
+      </ul>
+      <p>It does not cover the AI agents and MCP clients you connect to the service, such as Claude, Codex or ChatGPT, or the systems your agents read. Those are separate services with their own policies. If you run the open-source code from the GitHub repository yourself, it sends nothing to us, and this policy does not apply to it.</p>
+
+      <h2 id="website">Visiting this website</h2>
+      <p>The website is a set of static pages hosted on GitHub Pages by GitHub. It sets no cookies, runs no scripts, has no analytics and loads nothing from other sites. To deliver the pages, GitHub processes the connection data of each visit, including your IP address, and may keep it in its own logs; that is described in GitHub’s privacy statement. Legal basis: Art. 6(1)(f) GDPR, our legitimate interest in publishing the site reliably and securely.</p>
+
+      <h2 id="access">Who can use the service</h2>
+      <p>The service is invitation-only. The operator creates workspaces and adds members by email address; nobody else can sign in. Each person can be an active member of one workspace at a time. When a member is removed, their next request to the service is refused and their refresh tokens stop working; the membership record itself is kept (see <a href="#retention">How long data is kept</a>).</p>
+
+      <h2 id="google">Signing in with Google</h2>
+      <p>When an MCP client asks to connect, you approve it on a page of the service and then sign in with Google. We request only the scopes <code>openid</code> and <code>email</code>, not <code>profile</code>, so we receive no name and no picture. Google’s response is used to complete the sign-in and is not stored. From Google’s identity token we use three things: Google’s stable identifier for your account, your email address, and whether Google has verified it. Sign-in is refused unless the address is verified and belongs to an active member.</p>
+      <p>Your email address is stored on your membership, and Google’s account identifier is stored with it at your first sign-in. Neither is put into the tokens the service issues to MCP clients. Google itself learns that your account signed in to Responsibilities; that is Google’s own processing, described in Google’s privacy policy.</p>
+
+      <h2 id="content">What the service stores</h2>
+      <p>The service is a record that agents write to and read from. For each workspace it keeps:</p>
+      <ul>
+        <li><strong>Workspace and members:</strong> the workspace’s name and short name; for each member, the email address, Google’s account identifier, when the membership was added and, if it was, when it was removed.</li>
+        <li><strong>Responsibilities:</strong> for each version, its key, title, subject type, expectation and assessment labels, which member created it and when.</li>
+        <li><strong>Runs:</strong> which member and which MCP client started the run, with the client’s identifier and the name it registered with; the agent label the client declares (a name and, optionally, model, skill and skill version); the sources the agent reports reading, with whether each was read completely, a count and a note; when the run started and ended, its outcome, summary and report.</li>
+        <li><strong>Cases:</strong> each case’s subject identifier, such as an issue key or a submission id, its status, when it opened and closed, why it closed, and since when it has needed attention.</li>
+        <li><strong>Observations:</strong> the facts an agent records for each subject in a run, as keys and values, with the time.</li>
+        <li><strong>Decisions:</strong> for each subject in a run, the assessment, the next step with what it is on and an optional assignee, the basis in words, the facts it cites, a reason if the case was closed, and the time.</li>
+      </ul>
+      <p>This record is shared within the workspace: the service’s tools show its responsibilities, runs, cases, observations and decisions to any member of the workspace, and a run shown there includes the email address of the member under whom it was started.</p>
+      <p><strong>This content can be about other people.</strong> Subject identifiers, facts, notes, assignees, summaries and reports are written by your agents and can contain personal data about customers, colleagues or anyone else your sources mention. The service does not inspect content for personal data. Please record only what a responsibility needs, prefer identifiers to names, and do not record special categories of personal data, such as data about health, religious or political beliefs, or sexual orientation.</p>
+      <p>Legal basis: Art. 6(1)(b) GDPR for providing the service to its members. For content about other people, Art. 6(1)(f) GDPR, the legitimate interest being to keep the record a workspace uses the service for.</p>
+
+      <h2 id="connection">Sign-in, connection and security data</h2>
+      <ul>
+        <li><strong>MCP client registrations:</strong> the client’s identifier, its redirect addresses, the name it gives itself, when it registered and when an authorization was last started for it.</li>
+        <li><strong>Authorizations:</strong> for a sign-in in progress, an authorization code or a refresh token, the client, scope and resource it belongs to, the member once signed in, and an expiry time. Authorization codes, refresh tokens and the values that bind a sign-in to your browser are stored only as hashes. Access tokens are signed and not stored.</li>
+        <li><strong>Rate-limit counters</strong> for the endpoints anyone can call, client registration and authorization: where the hosting platform has established your IP address, the counter is identified by a keyed one-way hash of it, and the address itself is not written to the database. Otherwise, requests are counted in one shared counter.</li>
+      </ul>
+      <p>Legal basis: Art. 6(1)(b) GDPR for sign-in and connection data; Art. 6(1)(f) GDPR for rate-limit counters, the legitimate interest being to keep the service available and to prevent abuse.</p>
+
+      <h2 id="cookies">Cookies</h2>
+      <p>The website sets no cookies. The service sets two, only while you authorize an MCP client: <code>rm_consent</code> ties your approval to the browser the approval page was shown in, and <code>rm_provider</code> ties the return from Google to the same browser. Each holds a random value and nothing else, cannot be read by scripts, is sent only over HTTPS and lasts at most ten minutes; on the hosted service their names begin with <code>__Host-</code>. They are strictly necessary for the sign-in you asked for (§ 25(2) no. 2 TDDDG), so no consent banner is shown. The service uses no other cookies and no other storage in your browser.</p>
+
+      <h2 id="providers">Service providers</h2>
+      <ul>
+        <li><strong>Google</strong> is the identity provider for sign-in, as described above.</li>
+        <li><strong>Vercel</strong> hosts the service. It receives the connection and request data of every request, including IP addresses, and keeps platform logs of its own.</li>
+        <li><strong>Neon</strong> provides the PostgreSQL database that stores the records described above. It receives connections from the service, not from your browser or MCP client.</li>
+        <li><strong>GitHub</strong> hosts this website.</li>
+      </ul>
+      <p>Processing by these providers may take place outside the EU and EEA, in particular in the United States. Such transfers rely on these safeguards:</p>
+      <ul>
+        <li><strong>Vercel</strong> is certified under the EU–U.S. Data Privacy Framework, and its data processing terms include standard contractual clauses.</li>
+        <li><strong>Neon</strong>’s data processing terms provide for the EU–U.S. Data Privacy Framework and standard contractual clauses.</li>
+        <li><strong>Google</strong> is certified under the EU–U.S. Data Privacy Framework.</li>
+        <li><strong>GitHub</strong> is certified under the EU–U.S. Data Privacy Framework and states that it generally relies on standard contractual clauses.</li>
+      </ul>
+      <p>The EU–U.S. Data Privacy Framework is covered by an adequacy decision of the European Commission (Art. 45 GDPR); standard contractual clauses are safeguards under Art. 46(2)(c) GDPR. For a copy of these safeguards, write to <a href="mailto:info@responsibilities.dev">info@responsibilities.dev</a>.</p>
+      <p>The service contains no AI model and calls no model provider. Apart from its database at Neon, the only service it sends requests to is Google, during sign-in. There is no analytics, tracking or advertising, the service processes no payment data, and we do not sell your data or pass it on for anyone else’s purposes.</p>
+
+      <h2 id="retention">How long data is kept</h2>
+      <p>The service does not delete workspace content or memberships by itself. Responsibilities, runs, cases, observations and decisions are kept until they are deleted on request. Removing a member ends their access but keeps the membership record, including the email address, because the runs and versions they created refer to it.</p>
+      <p>Sign-in and connection data expires: a sign-in in progress after ten minutes, an authorization code after one minute, an access token after one hour, and a refresh token thirty days after the authorization it came from. A client registration becomes eligible for deletion ninety days after an authorization was last started for it, or after it registered if none was, and a rate-limit counter about a day after it was last used. Expired records can no longer be used. They are removed during later requests rather than on a schedule, so they can remain in the database for a while.</p>
+      <p>Our providers keep backups and logs on their own terms. Deleting data from the service does not necessarily remove it from those at the same moment.</p>
+
+      <h2 id="rights">Your rights</h2>
+      <p>Subject to the legal conditions, you have the right to access your personal data (Art. 15 GDPR), to have it corrected (Art. 16) or erased (Art. 17), to have its processing restricted (Art. 18), to receive it in a portable format (Art. 20), and to object to processing based on legitimate interests (Art. 21).</p>
+      <p>The service has no self-service export or deletion. Write to <a href="mailto:info@responsibilities.dev">info@responsibilities.dev</a>, and the operator handles your request by hand.</p>
+      <p>You can also lodge a complaint with a data protection supervisory authority (Art. 77 GDPR), in particular in the EU member state where you live or work or where the alleged infringement took place.</p>
+
+      <h2 id="changes">Changes to this policy</h2>
+      <p>Responsibilities is at an early stage, and the service changes as it develops. When what we process changes, this page changes with it; the date at the top says when it last did. See also the <a href="terms.html">Terms of Service</a>.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p><span class="brand-text">responsibilities.dev</span> · Persistent Responsibilities for AI Agents</p>
+      <nav aria-label="Legal">
+        <ul role="list">
+          <li><a href="privacy.html" aria-current="page">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+          <li><a href="impressum.html">Impressum</a></li>
+        </ul>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
