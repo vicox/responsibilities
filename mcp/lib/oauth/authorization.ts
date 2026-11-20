@@ -1,0 +1,306 @@
+import { randomBytes } from "node:crypto";
+
+import { errorRedirect, validateAuthorization } from "./authorization-request.ts";
+import { deployment, signingKey } from "./config.ts";
+import { consentPage, handOffPage } from "./consent.ts";
+import {
+  clearConsentBinding,
+  consentBindingOf,
+  newBinding,
+  setConsentBinding,
+  setProviderBinding,
+} from "./flow-binding.ts";
+import { challengeFor, createPkce } from "./pkce.ts";
+import { wrongOrigin } from "./origin.ts";
+import {
+  AUTHORIZATIONS_PER_WINDOW,
+  AUTHORIZATION_WINDOW_MS,
+  callerBucket,
+  tooManyRequestsPage,
+} from "./rate-limit.ts";
+import { identityProvider } from "./provider.ts";
+import { configurationFault, errorPage } from "./responses.ts";
+import { PENDING_LOGIN_TTL_MS, oauthStore } from "./store.ts";
+
+/**
+ * The authorization endpoint: two steps at one URL.
+ *
+ *     GET   validate the request, then ask the user           ─►  consent page
+ *     POST  the user answered                                 ─►  the provider
+ *
+ * Two methods rather than two paths, so `authorization_endpoint` in the
+ * discovery document names one place, and so the approval and the request it
+ * approves stay together — the only reason the POST exists is the GET.
+ *
+ * Nothing here decides who the user is. That is the identity provider's job and
+ * happens after approval; this endpoint's own work is deciding whether the
+ * client may ask at all.
+ */
+
+export async function handleAuthorize(request: Request): Promise<Response> {
+  let config;
+  // The key is read here rather than where it is used, so that a deployment
+  // missing it is answered as the configuration fault it is instead of failing
+  // later with something shaped like a client error. It is needed on this path
+  // because the rate-limit bucket is derived from it: see `callerBucket`.
+  let key;
+  try {
+    config = deployment();
+    key = signingKey();
+  } catch (error) {
+    return configurationFault(error, "text");
+  }
+
+  // First, before the database is even opened: a request at a hostname this
+  // deployment does not serve is not a request for this server.
+  const misdirected = wrongOrigin(request, config, "text");
+  if (misdirected) return misdirected;
+
+  const store = await oauthStore();
+
+  // Counted before anything is read or written on this caller's behalf. Every
+  // visit that gets past here parks a request, so the ceiling is what keeps a
+  // stranger from filling the table with them.
+  const allowed = await store.consumeRateLimit(
+    callerBucket("authorize", request, key),
+    AUTHORIZATIONS_PER_WINDOW,
+    AUTHORIZATION_WINDOW_MS,
+  );
+  if (!allowed) return tooManyRequestsPage("authorization requests");
+
+  const params = new URL(request.url).searchParams;
+  const clientId = params.get("client_id");
+  const client = clientId ? await store.client(clientId) : undefined;
+
+  const validated = validateAuthorization(params, client, config);
+
+  if ("kind" in validated) {
+    if (validated.kind === "unredirectable") {
+      return errorPage(validated.error, validated.description, validated.status);
+    }
+    return redirect(errorRedirect(validated, config.issuer));
+  }
+
+  // Everything the flow will need is decided now and parked, the nonce and our
+  // own PKCE pair included. Generating them here rather than after approval
+  // means the values checked on the way back were fixed before the user was
+  // sent anywhere.
+  const { verifier } = createPkce();
+  // The value the browser will hold, and the record it unlocks. Only its hash is
+  // stored, so the cookie is the only copy that can be presented.
+  const consentSession = newBinding();
+  const reference = await store.parkLogin({
+    clientId: validated.clientId,
+    redirectUri: validated.redirectUri,
+    codeChallenge: validated.codeChallenge,
+    scope: validated.scope,
+    resource: validated.resource,
+    clientState: validated.clientState,
+    nonce: randomBytes(16).toString("base64url"),
+    providerCodeVerifier: verifier,
+  }, consentSession);
+
+  return new Response(
+    consentPage({
+      clientName: client?.clientName,
+      redirectUri: validated.redirectUri,
+      reference,
+      // The path rather than the absolute URL. Both are the same destination, and
+      // `form-action 'self'` admits either — but a path cannot disagree with the
+      // document it was served in, which an absolute URL built from configuration
+      // could. Derived from the endpoint the metadata advertises, so the approval
+      // can only ever post back to the endpoint that served it.
+      action: new URL(config.authorizationEndpoint).pathname,
+    }),
+    {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "set-cookie": setConsentBinding(reference, consentSession, config, PENDING_LOGIN_TTL_MS / 1000),
+        // A consent decision has to be made on this page, not inside someone
+        // else's. Framing it is how a clickjacking attack collects an approval
+        // the user believed was something else.
+        "x-frame-options": "DENY",
+        "content-security-policy": consentPolicy(identityProvider().authorizationOrigin),
+        "referrer-policy": "no-referrer",
+      },
+    },
+  );
+}
+
+/**
+ * The user answered the consent page.
+ *
+ * The parked request is taken, not read: the reference is spent here, so a
+ * submission cannot be replayed, and a page that was never served the reference
+ * cannot forge one. That is what stands in for a separate CSRF token.
+ */
+export async function handleConsent(request: Request): Promise<Response> {
+  let config;
+  try {
+    config = deployment();
+  } catch (error) {
+    return configurationFault(error, "text");
+  }
+
+  const misdirected = wrongOrigin(request, config, "text");
+  if (misdirected) return misdirected;
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return errorPage("invalid_request", "The approval could not be read.", 400);
+  }
+
+  const reference = form.get("request");
+  if (typeof reference !== "string") {
+    return errorPage("invalid_request", "The approval form was incomplete.", 400);
+  }
+
+  // The binding the browser is carrying. A cross-site submission has none,
+  // because the cookie is SameSite=Strict — and an approval without one resumes
+  // nothing, because the record was parked with a binding to match.
+  const presented = consentBindingOf(request, reference, config);
+  const forget = clearConsentBinding(reference, config);
+
+  if (presented === null) {
+    return errorPage(
+      "invalid_request",
+      "This approval did not come from the browser that was shown the page. Start again from your MCP client.",
+      400,
+      forget,
+    );
+  }
+
+  const store = await oauthStore();
+  const login = await store.takeLogin(reference, presented);
+  if (!login) {
+    return errorPage(
+      "invalid_request",
+      "This authorization request has expired, was already used, or was approved from a different browser. Start again from your MCP client.",
+      400,
+      forget,
+    );
+  }
+
+  if (form.get("approve") !== "yes") {
+    // A refusal is the client's answer to receive, not an error page for the
+    // user to be stuck on. `access_denied` is what OAuth defines for exactly
+    // this, and the client can then say so in its own words.
+    //
+    // Handed over on this origin rather than redirected to, because the client's
+    // origin is registered by whoever registered the client and must not appear in
+    // this flow's `form-action`. See `handOffPage`.
+    return handOff(
+      errorRedirect(
+        {
+          kind: "redirectable",
+          redirectUri: login.redirectUri,
+          error: "access_denied",
+          description: "The user declined to connect this application.",
+          clientState: login.clientState,
+        },
+        config.issuer,
+      ),
+      forget,
+    );
+  }
+
+  // Approved. Park it again; the new reference is what travels as the provider's
+  // `state`, so a value the provider echoes back can only have come from an
+  // approval that happened.
+  //
+  // Bound to a *fresh* value this browser is given as a cookie, because "an
+  // approval happened" is not the same claim as "the browser that approved is the
+  // browser signing in". Without the binding, the Google URL below is a bearer
+  // credential for this approval: opened in another browser it would mint a
+  // code for whoever that browser is signed in to Google as, joining
+  // one person's approval to another person's identity. See flow-binding.ts.
+  const providerBinding = newBinding();
+  const state = await store.parkLogin(login, providerBinding);
+
+  try {
+    return redirect(
+      identityProvider().authorizationUrl({
+        redirectUri: config.callbackEndpoint,
+        state,
+        nonce: login.nonce,
+        codeChallenge: challengeFor(login.providerCodeVerifier),
+      }),
+      // Two cookies on one response: the consent binding is spent and taken away,
+      // and the provider binding replaces it for the leg that follows.
+      [forget, setProviderBinding(state, providerBinding, config, PENDING_LOGIN_TTL_MS / 1000)],
+    );
+  } catch (error) {
+    return configurationFault(error, "text");
+  }
+}
+
+/**
+ * The consent page's Content-Security-Policy.
+ *
+ * Everything is denied, and then the least that has to be allowed back. The one
+ * directive that can stop the flow rather than merely harden it is `form-action`,
+ * because a browser checks it against where a form submission *lands* as well as
+ * where it was addressed — and this page's one form performs two navigations:
+ * the approval posts back here, and the answer is a redirect to the identity
+ * provider. Chrome enforces the second leg, Firefox does not; naming both is what
+ * makes the flow complete in either.
+ *
+ * The provider's origin is the only value here that is not a literal, and it
+ * comes from the provider implementation. Nothing a request carried can reach
+ * this string: a redirect URI from a dynamic registration, a header, a query
+ * parameter would each let a caller name its own origin as a place this page may
+ * send an approval.
+ *
+ * `style-src 'unsafe-inline'` is unchanged and is what lets the page carry its
+ * own `<style>` block; it grants nothing to a script, which `default-src 'none'`
+ * continues to refuse outright.
+ */
+function consentPolicy(providerOrigin: string): string {
+  return [
+    "frame-ancestors 'none'",
+    "default-src 'none'",
+    "style-src 'unsafe-inline'",
+    `form-action 'self' ${providerOrigin}`,
+  ].join("; ");
+}
+
+/**
+ * A refusal, answered on this origin and carried onward by the page itself.
+ *
+ * `200` rather than a redirect: the point is that the navigation to the client is
+ * not one this form performed, so `form-action` never governs it and the client's
+ * origin never has to be trusted. The policy here is tighter than the consent
+ * page's — this page has no form and no style block, so both are denied outright.
+ */
+function handOff(location: string, setCookie: string): Response {
+  return new Response(handOffPage(location), {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "set-cookie": setCookie,
+      "x-frame-options": "DENY",
+      "content-security-policy": "default-src 'none'; form-action 'none'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+    },
+  });
+}
+
+/**
+ * A 302 built by hand rather than with `Response.redirect`.
+ *
+ * `Response.redirect` refuses a URL it considers non-absolute and gives no
+ * chance to set headers; a redirect mid-flow must not be cached, so the header
+ * matters.
+ */
+function redirect(location: string, setCookies: string | string[] = []): Response {
+  const headers = new Headers({ location, "cache-control": "no-store" });
+  for (const cookie of typeof setCookies === "string" ? [setCookies] : setCookies) {
+    headers.append("set-cookie", cookie);
+  }
+  return new Response(null, { status: 302, headers });
+}

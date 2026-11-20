@@ -1,0 +1,40 @@
+{
+  "name": "responsibilities-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "DEV_DATABASE_DIR=memory:// node --test \"lib/**/*.test.ts\"",
+    "test:pg": "RM_REQUIRE_TEST_DATABASE=1 DEV_DATABASE_DIR=memory:// node --env-file-if-exists=.env.test.local --test --test-concurrency=1 \"lib/**/*.pg.test.ts\" lib/oauth/store.test.ts",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "db:migrate": "node lib/db/migrate-cli.ts",
+    "admin": "node scripts/admin.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.7",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "jose": "^6.2.10",
+    "next": "16.3.1",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.1",
+    "typescript": "^5"
+  }
+}

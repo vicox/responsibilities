@@ -1,0 +1,118 @@
+import { MAX_REGISTRATION_BYTES, validateRegistration } from "./clients.ts";
+import { deployment, signingKey } from "./config.ts";
+import { wrongOrigin } from "./origin.ts";
+import {
+  REGISTRATIONS_PER_WINDOW,
+  REGISTRATION_WINDOW_MS,
+  callerBucket,
+  tooManyRequests,
+} from "./rate-limit.ts";
+import { configurationFault, json, oauthError } from "./responses.ts";
+import { oauthStore } from "./store.ts";
+
+/**
+ * Dynamic Client Registration, per RFC 7591.
+ *
+ * How an MCP client that has never met this server gets a client id: it posts
+ * its redirect URIs and receives one, with no human registering anything in
+ * advance. That is what lets a client be handed a bare URL and complete a flow,
+ * and it is why the endpoint is open — an unauthenticated POST is the whole
+ * point of the mechanism, and requiring pre-registration would defeat it.
+ *
+ * Open, but not unguarded: what is accepted is decided in `clients.ts`, and a
+ * client id grants nothing on its own. It names where an authorization code may
+ * be delivered, and a code is worthless without both a user approving the
+ * client and the PKCE verifier only the client that began the flow holds.
+ *
+ * The current MCP specification marks RFC 7591 deprecated in favour of Client
+ * ID Metadata Documents, while keeping it available for authorization servers
+ * that do not implement them. The deprecated mechanism is implemented here on
+ * purpose: it is the one every MCP client in the field speaks today, and
+ * offering only the newer one would leave this endpoint unreachable in practice.
+ */
+export async function handleRegistration(request: Request): Promise<Response> {
+  let config;
+  // Needed here for the rate-limit bucket, as on the authorization endpoint.
+  let key;
+  try {
+    config = deployment();
+    key = signingKey();
+  } catch (error) {
+    return configurationFault(error);
+  }
+
+  const misdirected = wrongOrigin(request, config);
+  if (misdirected) return misdirected;
+
+  const store = await oauthStore();
+  const allowed = await store.consumeRateLimit(
+    callerBucket("register", request, key),
+    REGISTRATIONS_PER_WINDOW,
+    REGISTRATION_WINDOW_MS,
+  );
+  if (!allowed) return tooManyRequests("client registrations");
+
+  // The size cap is applied to the bytes, before anything is parsed: the body is
+  // the one part of the request whose cost is paid before its shape is known.
+  // Content-Length is checked first because it is free, and the read is checked
+  // again because a chunked request may not have declared one.
+  const declared = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > MAX_REGISTRATION_BYTES) {
+    return oversized();
+  }
+
+  let text: string;
+  try {
+    text = await request.text();
+  } catch {
+    return oauthError("invalid_client_metadata", "The request body could not be read.", 400);
+  }
+  if (Buffer.byteLength(text, "utf8") > MAX_REGISTRATION_BYTES) return oversized();
+
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return oauthError("invalid_client_metadata", "The request body must be JSON.", 400);
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return oauthError("invalid_client_metadata", "The request body must be a JSON object.", 400);
+  }
+
+  const validated = validateRegistration(body);
+  if ("error" in validated) return json(validated, 400);
+
+  const client = await (await oauthStore()).registerClient({
+    redirectUris: validated.redirectUris,
+    clientName: validated.clientName,
+  });
+
+  // No client_secret, and its absence is the answer rather than an omission:
+  // `token_endpoint_auth_method: "none"` tells the client it is a public client
+  // and that PKCE is what will prove its token requests.
+  return json(
+    {
+      client_id: client.clientId,
+      client_id_issued_at: Math.floor(client.registeredAt / 1000),
+      redirect_uris: client.redirectUris,
+      ...(client.clientName ? { client_name: client.clientName } : {}),
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+      // No `registration_client_uri`, and no `registration_access_token`. RFC 7592
+      // makes them a pair and a promise: an address where a client may read back,
+      // update or delete its own registration, and the credential for doing it.
+      // This server implements neither, so advertising the address would point clients
+      // at an endpoint that answers registrations and nothing else.
+    },
+    201,
+  );
+}
+
+function oversized(): Response {
+  return oauthError(
+    "invalid_client_metadata",
+    `A client registration may be at most ${MAX_REGISTRATION_BYTES} bytes.`,
+    413,
+  );
+}
