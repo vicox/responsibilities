@@ -140,6 +140,9 @@ CREATE TABLE runs (
   client_name       text,                  -- self-declared at client registration
   agent             jsonb NOT NULL,        -- self-declared {name, model?, skill?, skill_version?}
   started_at        timestamptz NOT NULL DEFAULT now(),
+  last_active_at    timestamptz,           -- migration 2: start_run, then every accepted
+                                           -- record_observations; null = started before it
+                                           -- existed: held for its lifetime until a write
   sources           jsonb,                 -- set once by the first record_observations
   completed_at      timestamptz,
   outcome           text CHECK (outcome IN ('completed', 'partial', 'failed', 'abandoned')),
@@ -214,20 +217,43 @@ deletes a row and never updates `members.workspace_id` or `members.google_sub` o
 ### 5.1 Runs
 
 - **One open run per responsibility** (index `runs_one_open`). `start_run` locks the
-  responsibility row `FOR UPDATE`, then:
+  responsibility row `FOR NO KEY UPDATE` and the open run `FOR UPDATE`, then:
   - an open run older than the run lifetime (**2 h**) is marked `abandoned` in the same
-    transaction;
-  - an open run within its lifetime → refused `run_in_progress` (with that run's summary and
-    `expires_at`), unless `supersede: true`, which marks it `abandoned` (summary: "superseded
-    by run <id>");
-  - then inserts the new run against the **current** version.
+    transaction (summary "expired: …");
+  - an open run **idle** for **10 min** — no `start_run` or accepted `record_observations`
+    since `last_active_at` — is marked `abandoned` in the same transaction (summary "idle: no
+    activity for 10 min; taken over by run <id>");
+  - any other open run is **held** → refused `run_in_progress` (with that run's summary,
+    `expires_at` and `reclaimable_at`, the time from which a `start_run` takes it over unless
+    it records again — never later than `expires_at`), unless `supersede: true`, which marks
+    it `abandoned` (summary: "superseded by run <id>");
+  - then inserts the new run against the **current** version, `last_active_at` = now.
   So the baseline a run reads at `start_run` — the last completed run — cannot change before it
-  completes.
+  completes, and an agent that died blocks the next one for at most 10 min, with no person
+  asked to supersede and nothing running in the background.
+- `start_run` reads the time once it holds the responsibility row and the open run, so it
+  judges the open run at the time it got them. The hold itself — of a new run, or renewed by
+  `record_observations` — is stamped by the transaction's **last** statement with the time
+  read there, so a call that waited or stalled anywhere in its transaction holds the run from
+  when it lands.
+- A run started before `last_active_at` existed (null) has no known activity: it is held for
+  its whole lifetime, as before, until a write gives it an activity time.
+- Who calls `start_run` makes no difference to the hold: one OAuth client (a claude.ai
+  connector, a Claude Code installation) serves several concurrent sessions, so the same
+  member and client is no evidence that the open run is dead.
+- Idleness only matters to a `start_run`: an idle run nobody took over still accepts its
+  owner's writes (which renew it) and completes. A run taken over refuses its owner's next
+  write `run_abandoned` with the abandonment summary; its observations are kept. The cost of
+  the hold, stated: a live run silent for 10 min (a long gap before its first or after its
+  last `record_observations`) loses its recording if another `start_run` arrives in that gap;
+  the newer run then carries the responsibility forward.
 - A run belongs to the member **and** `client_id` that started it; anyone else gets
   `run_not_yours`.
 - Every write (`record_observations`, `complete_run`) runs in one transaction that first
   `SELECT … FROM runs … FOR UPDATE` the run and re-checks owner, state and lifetime. A
-  write therefore lands entirely before completion or is refused.
+  write therefore lands entirely before completion or is refused. An accepted
+  `record_observations` sets `last_active_at` on that locked row, so a takeover waiting for the
+  lock judges the renewed row: the write and the takeover never both land.
 - `sources` are declared in the run's first `record_observations` and are immutable for the
   run: a call without them before they exist is `sources_required`; a later call may repeat a
   canonically identical declaration (a no-op, so a retried first call is safe) or omit it; a
@@ -337,7 +363,7 @@ Context    = { responsibility: { key, title, subject_type, version, expectation,
 | 1 | `get_server_info` | `{}` | `{name, version, workspace: {slug, name}, member: email, client: {id, name}}` | — | read-only |
 | 2 | `put_responsibility` | `{key, title (1–120), subject_type (^[a-z][a-z0-9_]{0,59}$), expectation (1–8000), assessments: {label (^[a-z][a-z0-9_]{0,39}$), attention}[] (1–20, unique)}` | `{key, version, changed, previous_version}`; same content as the current version → `changed: false`, nothing written. Creation and versioning lock the responsibility row. | `invalid_*` | idempotent |
 | 3 | `get_responsibility` | `{key, include_facts?: boolean = false}` | `Context` | `unknown_responsibility` (lists keys) | read-only |
-| 4 | `start_run` | `{responsibility: key, agent: {name (1–60), model? (≤80), skill? (≤120), skill_version? (≤80)}, supersede?: boolean = false}` | `{run_id, started_at, expires_at, run_limit: 1000, expectation_changed_since_last_run, ...Context}` with facts | `unknown_responsibility`, `run_in_progress` | not idempotent |
+| 4 | `start_run` | `{responsibility: key, agent: {name (1–60), model? (≤80), skill? (≤120), skill_version? (≤80)}, supersede?: boolean = false}` | `{run_id, started_at, expires_at, run_limit: 1000, expectation_changed_since_last_run, ...Context}` with facts | `unknown_responsibility`, `run_in_progress` (`{run, expires_at, reclaimable_at}`; §5.1) | not idempotent |
 | 5 | `record_observations` | `{run_id, sources?: Source[] (1–10; required until declared, then optional and must be identical), subjects: {subject (1–200), facts}[] (0–200, unique by lower(subject))}` | `{run_id, subjects: {subject, case: "new" \| "existing", case_status, previous: {run_id, observed_at, agent} \| null, changes: {added, removed, became_unknown, changed: {key, from, to}[]}, unchanged}[], not_observed_so_far: string[]}` | `unknown_run`, `run_not_yours`, `run_completed`, `run_abandoned`, `run_expired`, `sources_required`, `sources_conflict`, `duplicate_subject`, `invalid_fact`, `run_too_large` | idempotent per run |
 | 6 | `complete_run` | `{run_id, outcome: "completed" \| "partial" \| "failed", summary? (required if failed), report?, decisions: {subject, assessment, attention: {action, target, assignee?} \| null, basis, cites?: key[] (≤20), close?: {reason (1–300)}}[] (0–1000)}` | `{run_id, outcome, completed_at, cases: {subject, status, attention: "opened" \| "continued" \| "ended" \| "none", attention_since}[], not_decided: string[] /*observed, no decision*/, not_observed: string[]}`; a repeat by the same member and client returns the stored result plus `already_completed: true` | `unknown_run`, `run_not_yours`, `run_abandoned`, `run_expired`, `sources_required`, `unobserved_subject`, `duplicate_subject`, `unknown_assessment`, `attention_mismatch`, `close_with_attention` | idempotent |
 | 7 | `get_case` | `{responsibility: key, subject, limit?: 1–50 = 10}` | `{subject, status, opened_at, closed_at, close_reason, attention_since, history: {run: RunSummary, observed_at, facts, decision: {assessment, attention, basis, cites, status, close_reason} \| null}[]}` newest first, completed runs only | `unknown_responsibility`, `unknown_case` | read-only |
@@ -506,7 +532,8 @@ behaves exactly as today and the source note says "no history"):
 
 1. After the date command: `start_run` (`agent.name` = the host, `skill` =
    `lively-findings:status`, `skill_version` = plugin commit if known). On `run_in_progress`,
-   report without history and say so; never `supersede` unless the request asks.
+   report without history and say so; never `supersede` unless the request asks. On
+   `run_abandoned` later in the run (idle 10 min and taken over), the same.
 2. Gather as today. The run's subjects are every submission ID the four sources return **plus
    every open case from `start_run`**. **Overflow:** if the context was `truncated` or this
    combined set exceeds `run_limit`, record the sources only (a source-only call), then
@@ -563,9 +590,9 @@ behaves exactly as today and the source note says "no history"):
 | `lib/workspace/members.test.ts` | non-member refused; first login binds `google_sub`; same email from another Google account refused; token `sub` is the member id; a removed member's code and refresh are refused and the family revoked; a removed-then-re-added person's old token is refused at `/mcp` |
 | `lib/mcp/endpoint.test.ts` | 401 without token, wrong audience, expired; 404 off the canonical host; `tools/list` returns exactly the 7 tools; `get_server_info` names the workspace |
 | `lib/responsibilities/model.test.ts` | fact validation and normalisation; coverage carry-over; the diff table; the transition table incl. reopen with and without attention |
-| `lib/responsibilities/store.test.ts` | versioning (same content no-op, change → +1); one open run, `run_in_progress`, expiry → abandoned, `supersede`; run ownership; `sources_required`, a repeated identical first call (with and without subjects) is a no-op, a differing declaration is `sources_conflict`; source-only call; same-subject retry replaces; the 1 001st distinct subject is `run_too_large` and a `failed` completion with no decisions still succeeds; immutability after completion; `unobserved_subject`; vocabulary refusals against the run's version; `complete_run` atomic and replayed from `completion` (also after a later run and after the lifetime); two workspaces with identical keys and subjects see nothing of each other |
+| `lib/responsibilities/store.test.ts` | versioning (same content no-op, change → +1); one open run, `run_in_progress`, expiry → abandoned, `supersede`; a run is held for 10 min after `start_run` and every accepted `record_observations` (with or without subjects; not after a refused one) against every other session, the same member and client included, and then taken over by the next `start_run` with the baseline of the last completed run; an idle run nobody took over still records and completes; activity never extends the 2 h lifetime; a run with null `last_active_at` is held for its lifetime, however recent its writes, until a write sets it; a write or a start that waited for its transaction holds the run from when it lands; run ownership; `sources_required`, a repeated identical first call (with and without subjects) is a no-op, a differing declaration is `sources_conflict`; source-only call; same-subject retry replaces; the 1 001st distinct subject is `run_too_large` and a `failed` completion with no decisions still succeeds; immutability after completion; `unobserved_subject`; vocabulary refusals against the run's version; `complete_run` atomic and replayed from `completion` (also after a later run and after the lifetime); two workspaces with identical keys and subjects see nothing of each other |
 | `lib/responsibilities/two-runs.test.ts` | store-level scenario: run 1 by agent A; run 2 by a different member and client with one fact changed, one returned `null`, one ticket removed under a complete source, one under an incomplete source (→ `became_unknown`), an array fact going to `null` (omitted `issuelinks`), to `[]` (returned, no link) and to `["FIND-1:?"]` (link without status) as three distinct results, one subject in no source, one new — asserts `last_run`, `changes`, `continued` with run 1's `attention_since`, `opened` for changed attention |
-| `lib/**/*.pg.test.ts` (`npm run test:pg`, needs `TEST_DATABASE_URL`) | on real Postgres with independent connections: two concurrent `start_run` → one run; `record_observations` racing `complete_run` → lands before or is refused, never after; concurrent first-login binds → one bound; `member:remove` racing refresh → refused or followed by `/mcp` refusal |
+| `lib/**/*.pg.test.ts` (`npm run test:pg`, needs `TEST_DATABASE_URL`) | on real Postgres with independent connections: two concurrent `start_run` → one run; a takeover of an idle run racing its owner's renewing write → exactly one lands; a write or a start that waited for a lock, or stalled after taking it, holds the run from when it lands; `record_observations` racing `complete_run` → lands before or is refused, never after; concurrent first-login binds → one bound; `member:remove` racing refresh → refused or followed by `/mcp` refusal |
 
 The judgment itself is not unit-tested here; it is tested on planted data in §12.A.
 
@@ -660,6 +687,8 @@ Pass = A, B and C all hold.
   judged; §12.A checks the judgment on planted data, not on live data.
 - **Risk — prompt injection through history.** Stored text from other agents reaches the next
   agent; tool descriptions and the skill treat it as data; facts carry no free text from sources.
-- **Risk — a crashed run blocks new runs** for up to 2 h unless a person asks for `supersede`.
+- **Risk — a crashed run blocks new runs** for up to 10 min (§5.1, idle takeover); before,
+  for up to 2 h unless a person asked for `supersede`. Conversely a live run silent for 10 min
+  can be taken over by a concurrent `start_run`.
 - **Risk — DCR deprecation.** The current MCP specification prefers Client ID Metadata
   Documents; **Tonight** implements DCR because clients in the field use it. Same choice here.

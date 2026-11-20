@@ -111,5 +111,13 @@ export const RESPONSIBILITIES_SCHEMA: SchemaModule = {
         CREATE INDEX decisions_case ON decisions (workspace_id, case_id, decided_at DESC);
       `,
     },
+    {
+      // The run's last activity: start_run, then every accepted record_observations.
+      // Null on runs started before this column existed, whose activity is unknown:
+      // such a run is held for its whole lifetime until a write sets it.
+      // Nullable and not backfilled, so no existing row is rewritten.
+      version: 2,
+      sql: `ALTER TABLE runs ADD COLUMN last_active_at timestamptz;`,
+    },
   ],
 };

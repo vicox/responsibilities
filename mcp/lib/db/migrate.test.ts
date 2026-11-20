@@ -11,7 +11,7 @@ test("a fresh database migrates every module; a second run is a no-op", async ()
   try {
     const first = [];
     for (const schema of ALL_SCHEMAS) first.push(await migrate(db, schema));
-    assert.deepEqual(first, [1, 1, 1]);
+    assert.deepEqual(first, [1, 1, 2]);
     assert.deepEqual(
       ALL_SCHEMAS.map((schema) => schema.module),
       ["oauth", "workspace", "responsibilities"],
@@ -48,7 +48,7 @@ test("concurrent migrations apply each version once", async () => {
   try {
     for (const schema of ALL_SCHEMAS) {
       const applied = await Promise.all([migrate(db, schema), migrate(db, schema), migrate(db, schema)]);
-      assert.equal(applied.reduce((a, b) => a + b, 0), 1, schema.module);
+      assert.equal(applied.reduce((a, b) => a + b, 0), schema.migrations.length, schema.module);
     }
   } finally {
     await db.close();
