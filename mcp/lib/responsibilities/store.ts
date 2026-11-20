@@ -452,10 +452,14 @@ export function responsibilityStore(
   /**
    * When the next `start_run` may take the open run over: RUN_IDLE_MS after its
    * last activity, and never later than its lifetime. Its own writes renew it.
+   *
+   * A run started before `last_active_at` existed has none, and its writes up to
+   * then left no trace of when they happened, so it is held for its whole
+   * lifetime as before — until a write of this code gives it an activity time.
    */
   function reclaimableAt(run: { started_at: Date; last_active_at: Date | null }): Date {
-    const idle = (run.last_active_at ?? run.started_at).getTime() + RUN_IDLE_MS;
-    return new Date(Math.min(idle, expiresAt(run).getTime()));
+    if (!run.last_active_at) return expiresAt(run);
+    return new Date(Math.min(run.last_active_at.getTime() + RUN_IDLE_MS, expiresAt(run).getTime()));
   }
 
   function refuseIfExpired(run: RunRow, now: Date): void {
@@ -604,7 +608,6 @@ export function responsibilityStore(
     },
 
     async startRun({ responsibility: key, agent, supersede }) {
-      const now = clock();
       return driver.transaction(async (tx) => {
         const responsibility = await responsibilityByKey(tx, key, true);
         const runId = randomUUID();
@@ -617,6 +620,9 @@ export function responsibilityStore(
             FOR UPDATE`,
           [ws, responsibility.id],
         );
+        // The time is read once the locks are held, so a start that waited for
+        // them does not begin its own run, and with it its hold, in the past.
+        const now = clock();
         if (open) {
           const abandon = (summary: string) =>
             tx.query(
@@ -684,7 +690,6 @@ export function responsibilityStore(
     },
 
     async recordObservations(input) {
-      const now = clock();
       // Facts are validated before the database is touched.
       const normalised = input.subjects.map((entry) => ({
         subject: entry.subject,
@@ -694,6 +699,9 @@ export function responsibilityStore(
 
       return driver.transaction(async (tx) => {
         const run = await lockOwnRun(tx, input.run_id);
+        // Read once the run is locked: a write that waited for the lock renews
+        // the hold from when it lands, not from before the wait.
+        const now = clock();
         refuseIfAbandoned(run);
         if (run.completion) {
           throw new Refusal("run_completed", "This run is completed and immutable.", { run_id: run.id });

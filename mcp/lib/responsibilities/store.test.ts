@@ -271,28 +271,102 @@ test("activity never extends the 2 h lifetime", async () => {
   }
 });
 
-test("a run from before last_active_at existed is held from its start, and its writes renew it", async () => {
+test("a run from before last_active_at existed is held for its lifetime, until a write gives it activity", async () => {
   const w = await world();
   try {
     const alice = w.storeFor("alice");
     const bob = w.storeFor("bob", "client-b");
-    const start = () => bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false });
+    const start = (key: string) => bob.startRun({ responsibility: key, agent: AGENT_B, supersede: false });
+    const outcome = async (runId: string) =>
+      (await w.db.query<{ outcome: string | null; summary: string | null }>(
+        `SELECT outcome, summary FROM runs WHERE id = $1`,
+        [runId],
+      ))[0];
+    // Two runs that started and recorded under the code before last_active_at,
+    // whose writes therefore left no activity time.
+    const runs = [];
+    for (const key of ["legacy-quiet", "legacy-renewed"]) {
+      await alice.putResponsibility({ ...DEFINITION, key });
+      runs.push(await alice.startRun({ responsibility: key, agent: AGENT_A, supersede: false }));
+    }
+    const [quiet, renewed] = runs;
+    w.advance(25 * MINUTE);
+    for (const run of runs) {
+      await alice.recordObservations({
+        run_id: run.run_id,
+        sources: SOURCES,
+        subjects: [{ subject: "S1", facts: { "bugcrowd.state": "NEW" } }],
+      });
+      await w.db.query(`UPDATE runs SET last_active_at = NULL WHERE id = $1`, [run.run_id]);
+    }
+
+    // 30 min after its start and 5 after its last write: held, until its lifetime ends.
+    w.advance(5 * MINUTE);
+    for (const run of runs) {
+      const refused = await refusalDetail(start(run.responsibility.key));
+      assert.equal(refused.error, "run_in_progress");
+      assert.equal(refused.reclaimable_at, run.expires_at);
+    }
+
+    // A write of this code gives it an activity time; from then on the idle rule applies.
+    await alice.recordObservations({ run_id: renewed.run_id, subjects: [] });
+    w.advance(RUN_IDLE_MS - 1);
+    assert.equal(await refusal(start("legacy-renewed")), "run_in_progress");
+    w.advance(1);
+    const next = await start("legacy-renewed");
+    assert.equal((await outcome(renewed.run_id)).summary, `idle: no activity for 10 min; taken over by run ${next.run_id}`);
+
+    // Without one it is held to the end of its lifetime, then expires as before.
+    w.advance(new Date(quiet.expires_at).getTime() - w.now().getTime() - 1);
+    assert.equal(await refusal(start("legacy-quiet")), "run_in_progress");
+    w.advance(1);
+    await start("legacy-quiet");
+    assert.equal((await outcome(quiet.run_id)).summary, "expired: not completed within its 2 h lifetime");
+  } finally {
+    await w.close();
+  }
+});
+
+test("a write or a start that waited for its transaction holds the run from when it lands", async () => {
+  const w = await world();
+  try {
+    const alice = w.storeFor("alice");
+    const aliceElsewhere = w.storeFor("alice");
+    const bob = w.storeFor("bob", "client-b");
     await alice.putResponsibility(DEFINITION);
     const run = await alice.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false });
-    await w.db.query(`UPDATE runs SET last_active_at = NULL WHERE id = $1`, [run.run_id]);
-
-    w.advance(RUN_IDLE_MS - 1);
-    assert.equal(
-      (await refusalDetail(start())).reclaimable_at,
-      new Date(new Date(run.started_at).getTime() + RUN_IDLE_MS).toISOString(),
-    );
     await alice.recordObservations({ run_id: run.run_id, sources: SOURCES, subjects: [] });
-    w.advance(RUN_IDLE_MS - 1);
-    assert.equal(await refusal(start()), "run_in_progress");
-    w.advance(1);
-    await start();
-    const [old] = await w.db.query<{ outcome: string }>(`SELECT outcome FROM runs WHERE id = $1`, [run.run_id]);
-    assert.equal(old.outcome, "abandoned");
+
+    // The embedded database runs one transaction at a time: a call made while one
+    // is open waits for it, here for as long as the run may stay idle.
+    let recording: Promise<unknown> | undefined;
+    await w.db.transaction(async () => {
+      recording = alice.recordObservations({
+        run_id: run.run_id,
+        subjects: [{ subject: "S1", facts: { "bugcrowd.state": "NEW" } }],
+      });
+      w.advance(RUN_IDLE_MS);
+    });
+    await recording;
+    assert.equal(
+      await refusal(bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false })),
+      "run_in_progress",
+      "the write that landed holds the run",
+    );
+
+    // Likewise a start: the run it begins is not idle the moment it exists.
+    w.advance(RUN_IDLE_MS);
+    let starting: Promise<Awaited<ReturnType<typeof bob.startRun>>> | undefined;
+    await w.db.transaction(async () => {
+      starting = bob.startRun({ responsibility: DEFINITION.key, agent: AGENT_B, supersede: false });
+      w.advance(RUN_IDLE_MS);
+    });
+    const started = await starting!;
+    assert.equal(started.started_at, w.now().toISOString());
+    assert.equal(
+      await refusal(aliceElsewhere.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false })),
+      "run_in_progress",
+    );
   } finally {
     await w.close();
   }

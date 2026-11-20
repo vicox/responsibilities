@@ -189,6 +189,61 @@ test(
   },
 );
 
+test("a write or a start that waited for a lock holds the run from when it lands", { skip: pgSkip }, async () => {
+  const { drivers, drop, storeOn, workspaceId } = await setup();
+  const settle = <T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> =>
+    promise.then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (reason: unknown) => ({ status: "rejected" as const, reason }),
+    );
+  try {
+    let current = new Date("2026-11-19T09:00:00.000Z");
+    const now = () => new Date(current);
+    const wait = () => {
+      current = new Date(current.getTime() + RUN_IDLE_MS);
+    };
+    const alice = storeOn(1, "alice", "client-a", now);
+    const bob = storeOn(1, "bob", "client-b", now);
+    const start = (store: typeof alice) =>
+      settle(store.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false }));
+    await alice.putResponsibility(DEFINITION);
+    const { run_id } = await alice.startRun({ responsibility: DEFINITION.key, agent: AGENT_A, supersede: false });
+    await alice.recordObservations({ run_id, sources: SOURCES, subjects: [] });
+
+    // The owner's write waits RUN_IDLE_MS for the run's lock, then lands.
+    let recording: Promise<PromiseSettledResult<unknown>> | undefined;
+    await drivers[0].transaction(async (tx) => {
+      await tx.query(`SELECT id FROM runs WHERE workspace_id = $1 AND id = $2 FOR UPDATE`, [workspaceId, run_id]);
+      recording = settle(
+        alice.recordObservations({ run_id, subjects: [{ subject: "S1", facts: { "bugcrowd.state": "NEW" } }] }),
+      );
+      await untilSomeoneWaitsOnALock(drivers[2]);
+      wait();
+    });
+    assert.equal(code(await recording!), "ok");
+    assert.equal(code(await start(bob)), "run_in_progress", "the write that landed holds the run");
+
+    // A start waits RUN_IDLE_MS for the responsibility's lock, then takes over the idle run.
+    wait();
+    let starting: Promise<PromiseSettledResult<Awaited<ReturnType<typeof bob.startRun>>>> | undefined;
+    await drivers[0].transaction(async (tx) => {
+      await tx.query(`SELECT id FROM responsibilities WHERE workspace_id = $1 AND key = $2 FOR UPDATE`, [
+        workspaceId,
+        DEFINITION.key,
+      ]);
+      starting = start(bob);
+      await untilSomeoneWaitsOnALock(drivers[2]);
+      wait();
+    });
+    const started = await starting!;
+    assert.equal(code(started), "ok");
+    assert.equal(started.status === "fulfilled" && started.value.started_at, now().toISOString());
+    assert.equal(code(await start(alice)), "run_in_progress", "the run it began is not idle at once");
+  } finally {
+    await drop();
+  }
+});
+
 test("two concurrent start_run calls produce exactly one run", { skip: pgSkip }, async () => {
   const { drivers, drop, storeOn } = await setup();
   try {
