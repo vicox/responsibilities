@@ -20,13 +20,13 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.7",
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.3.1",
     "jose": "^6.2.10",
-    "next": "16.3.1",
+    "next": "16.4.6",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -16,6 +16,8 @@ const { mintAccessToken } = await import("../oauth/tokens.ts");
 const { database } = await import("../db.ts");
 const { memberIdFor, seedMembers } = await import("../testing.ts");
 const { addMember, removeMember, addWorkspace } = await import("../workspace/members.ts");
+const { MAX_PROTOCOL_ELEMENTS } = await import("./limits.ts");
+const { MAX_TOOL_INPUT_ELEMENTS } = await import("./server.ts");
 
 const db = await database();
 await seedMembers(db, ["alice", "bob"], "acme");
@@ -359,6 +361,100 @@ test("GET and DELETE on the endpoint are 405 once past the token check", async (
     );
     assert.equal(response.status, 405, method);
   }
+});
+
+// --- request limits (GHSA-46jr-4wx8-v453) ------------------------------------
+
+async function post(token: string, body: unknown, headers: Record<string, string> = {}) {
+  const response = await handleMcpRequest(
+    new Request(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        authorization: `Bearer ${token}`,
+        ...headers,
+      },
+      body: JSON.stringify(body),
+    }),
+  );
+  const text = await response.text();
+  return { status: response.status, json: JSON.parse(text) as { id?: unknown; error?: { code: number; message: string } } };
+}
+
+test("protocol metadata past the element bound is refused before the SDK validates it", async () => {
+  const token = await accessToken();
+  const icons = new Array(500_000).fill(0); // one megabyte of invalid entries
+
+  const modern = await post(
+    token,
+    {
+      jsonrpc: "2.0",
+      id: 7,
+      method: "tools/list",
+      params: {
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
+          "io.modelcontextprotocol/clientInfo": { name: "test-client", version: "1.0.0", icons },
+          "io.modelcontextprotocol/clientCapabilities": {},
+        },
+      },
+    },
+    { "mcp-protocol-version": PROTOCOL_VERSION, "mcp-method": "tools/list" },
+  );
+  assert.equal(modern.status, 400);
+  assert.equal(modern.json.error?.code, -32600);
+  assert.match(modern.json.error?.message ?? "", new RegExp(`more than ${MAX_PROTOCOL_ELEMENTS}`));
+  assert.equal(modern.json.id, 7);
+
+  const legacy = await post(token, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "legacy", version: "1", icons } },
+  });
+  assert.equal(legacy.status, 400);
+  assert.equal(legacy.json.error?.code, -32600);
+});
+
+test("a body the bound does not take is answered by the SDK as before: too large, not JSON", async () => {
+  const token = await accessToken();
+  const send = (body: string) =>
+    handleMcpRequest(
+      new Request(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${token}`,
+        },
+        body,
+      }),
+    );
+
+  assert.equal((await send(JSON.stringify({ padding: "x".repeat(5 * 1024 * 1024) }))).status, 413);
+
+  const unparseable = await send("{ not json");
+  assert.equal(unparseable.status, 400);
+  assert.match(await unparseable.text(), /-32700/);
+});
+
+test("tool arguments do not count against the protocol bound", async () => {
+  const result = await tool(await accessToken(), "get_server_info", {
+    padding: new Array(MAX_PROTOCOL_ELEMENTS * 5).fill(0),
+  });
+  assert.equal((result.structuredContent as ServerInfo).member, "alice@example.com");
+});
+
+test("tool arguments past MAX_TOOL_INPUT_ELEMENTS are refused before any schema runs", async () => {
+  const { status, json } = await call("tools/call", {
+    token: await accessToken(),
+    name: "get_server_info",
+    params: { name: "get_server_info", arguments: { padding: new Array(MAX_TOOL_INPUT_ELEMENTS).fill(0) } },
+  });
+  assert.equal(status, 200);
+  assert.equal(json.result?.isError, true);
+  assert.match(JSON.stringify(json.result), new RegExp(`maximum of ${MAX_TOOL_INPUT_ELEMENTS} elements`));
 });
 
 test("a tool answer carries no token and no secret", async () => {

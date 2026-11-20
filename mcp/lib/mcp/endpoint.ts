@@ -16,6 +16,7 @@ import { configurationFault } from "../oauth/responses.ts";
 import { accessTokenVerifier } from "../oauth/tokens.ts";
 import { responsibilityStore } from "../responsibilities/store.ts";
 import { mcpSession, type McpSession } from "../workspace/members.ts";
+import { limitProtocolElements } from "./limits.ts";
 import { responsibilitiesMcpServer } from "./server.ts";
 
 /**
@@ -27,6 +28,7 @@ import { responsibilitiesMcpServer } from "./server.ts";
  *        ↓  Bearer token valid for /mcp?       401 (+ resource_metadata) if not
  *        ↓  token subject an active member?    401 invalid_token if not
  *        ↓  Origin allowed?                    403 if not
+ *        ↓  protocol part of the body bounded? 400 if not (limits.ts)
  *        ↓  MCP server built for {workspace, member, client}
  *      tool
  *
@@ -101,7 +103,10 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
     );
   }
 
-  return mcpHandler().fetch(request, { authInfo: { ...auth, extra: { ...auth.extra, session } } });
+  const body = await limitProtocolElements(request);
+  if (body instanceof Response) return body;
+
+  return mcpHandler().fetch(request, { ...body, authInfo: { ...auth, extra: { ...auth.extra, session } } });
 }
 
 /** The session behind a verified token; by construction there always is one. */
