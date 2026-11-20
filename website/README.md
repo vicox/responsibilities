@@ -7,8 +7,8 @@ Plain HTML and CSS: no build step, framework, JavaScript or dependency.
 | --- | --- |
 | `index.html` | The page, with its title, description, canonical and Open Graph tags |
 | `impressum.html` | The Impressum (§ 5 DDG) |
-| `privacy.html` | The Privacy Policy, for this site and the hosted MCP service (`mcp/`) |
-| `terms.html` | The Terms of Service of the hosted MCP service |
+| `privacy.html` | The Privacy Policy, for this site and the hosted MCP service (`mcp/`), at `/privacy` |
+| `terms.html` | The Terms of Service of the hosted MCP service, at `/terms` |
 | `styles.css` | Layout and type, light and dark |
 | `favicon.svg` | Icon |
 | `CNAME` | Custom domain for GitHub Pages: `responsibilities.dev` |
@@ -19,9 +19,18 @@ The footer of every page links the Privacy Policy, the Terms of Service and the 
 The legal pages' statements about the service are drawn from the code in `mcp/`: when what
 the service stores, sends or keeps changes, update `privacy.html` (and its date) with it.
 
+The Privacy Policy and the Terms of Service have clean URLs,
+`https://responsibilities.dev/privacy` and `https://responsibilities.dev/terms`: GitHub Pages
+serves `privacy.html` at `/privacy` as well as at `/privacy.html`, without a redirect. Their
+canonical links and every link to them use the clean URL (`privacy`, `terms`); the old `.html`
+URLs keep serving the same page, so earlier links still work. Do not add a `privacy/` or
+`terms/` directory: GitHub Pages would then redirect `/privacy` to `/privacy/`.
+
 Assets are linked with relative URLs (`styles.css`, `favicon.svg`, `#examples`,
-`impressum.html`), so the pages work the same at `https://responsibilities.dev/`, under a
-project path such as `https://<user>.github.io/responsibilities.dev/` and on a local server.
+`impressum.html`, `privacy`), so the pages work the same at `https://responsibilities.dev/`,
+under a project path such as `https://<user>.github.io/responsibilities.dev/` and on a local
+server, except that `python3 -m http.server` does not serve the clean URLs: open
+`privacy.html` and `terms.html` there.
 The only absolute URLs are each page's canonical link, the home page's `og:url`, its links to
 the README and the simulation (`docs/simulation.md`) on GitHub and the legal pages' `mailto:`
 contacts.
@@ -37,7 +46,7 @@ the checks: they print the link to use.
     python3 tests/check.py          # prints OK or the failed checks
 
 The checks cover, on every page, well-formed markup, one `h1` and no skipped heading levels,
-the meta tags, a footer that links the three legal pages in order and repeats the claim, and that every link resolves (anchors on the other page included) and
+the meta tags, a footer that links the three legal pages in order and repeats the claim, and that every link resolves (anchors on the other page included, `privacy` and `terms` to their `.html` files as on GitHub Pages) and
 nothing external is loaded; plus the home page's key content (the hero word for word: the claim,
 its one subhead and its two calls to action, nothing else; the title and `og:title` with the
 claim, and the description and `og:description`; the four concepts of *How responsibilities
@@ -46,8 +55,9 @@ three steps of *Architecture*, each with its tag and text; the four functions an
 the simulation and the README in *Built for developers*; the order of the sections), wording
 that was retired and stays gone, a list of words the site does not use, the Impressum's required
 parts, the Privacy Policy's and Terms' date, operator, address and contacts (`info@` for legal
-and privacy matters, `support@` for help with the service), the `CNAME`, and WCAG AA contrast
-of the colour pairs in both colour schemes.
+and privacy matters, `support@` for help with the service), their clean URLs (the canonical
+links, no link to `privacy.html` or `terms.html`, no `privacy/` or `terms/` directory), the
+`CNAME`, and WCAG AA contrast of the colour pairs in both colour schemes.
 
 ## Deploy on GitHub Pages
 
