@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { MAX_FACT_ARRAY_ITEMS, MAX_FACT_KEYS, MAX_SUBJECTS_PER_CALL } from "../responsibilities/model.ts";
+import {
+  MAX_CITES,
+  MAX_COLUMNS,
+  MAX_KINDS_PER_RUN,
+  MAX_PROPOSAL_ATTENTIONS,
+  MAX_PROPOSALS,
+  MAX_ROW_ARRAY_ITEMS,
+  MAX_ROWS_PER_CALL,
+} from "../responsibilities/model.ts";
 import { protocolElementCount } from "./limits.ts";
 import { MAX_TOOL_INPUT_ELEMENTS } from "./server.ts";
 
@@ -27,22 +35,17 @@ test("counting stops once past the bound", () => {
   assert.equal(protocolElementCount(new Array(1_000_000).fill({}), 10), 1_000_000);
 });
 
-test("MAX_TOOL_INPUT_ELEMENTS is record_observations at its limits; complete_run at its limits is below it", () => {
+test("MAX_TOOL_INPUT_ELEMENTS is record_observations at its limits; complete_run and put_responsibility at theirs are below it", () => {
   const list = <T>(length: number, item: (index: number) => T): T[] => Array.from({ length }, (_, index) => item(index));
 
   const observations = {
     run_id: "00000000-0000-4000-8000-000000000000",
-    sources: list(10, (index) => ({
-      name: `source-${index}`,
+    observations: list(MAX_KINDS_PER_RUN, (index) => ({
+      kind: `k${index}`,
       complete: true,
-      count: 0,
-      note: "",
-      covers: list(10, (group) => `group_${group}`),
-    })),
-    subjects: list(MAX_SUBJECTS_PER_CALL, (index) => ({
-      subject: `S-${index}`,
-      facts: Object.fromEntries(
-        list(MAX_FACT_KEYS, (key) => [`fact_${key}`, list(MAX_FACT_ARRAY_ITEMS, (value) => `v${value}`)] as const),
+      replace: false,
+      rows: list(MAX_ROWS_PER_CALL / MAX_KINDS_PER_RUN, () =>
+        Object.fromEntries(list(MAX_COLUMNS, (column) => [`c${column}`, list(MAX_ROW_ARRAY_ITEMS, (value) => `v${value}`)] as const)),
       ),
     })),
   };
@@ -53,14 +56,34 @@ test("MAX_TOOL_INPUT_ELEMENTS is record_observations at its limits; complete_run
     outcome: "completed",
     summary: "s",
     report: "r",
-    decisions: list(1000, (index) => ({
-      subject: `S-${index}`,
-      assessment: "open",
-      attention: { action: "a", target: "t", assignee: "x" },
-      basis: "b",
-      cites: list(20, (cite) => `fact_${cite}`),
-      close: { reason: "r" },
-    })),
+    evaluation: {
+      basis: "0".repeat(64),
+      proposals: list(MAX_PROPOSALS, (index) => ({
+        subject: { type: "t", keys: { a: `S-${index}`, b: 1, c: 2 } },
+        status: "open",
+        cites: list(MAX_CITES, (cite) => `run:${cite}`),
+        title: "t",
+        summary: "s",
+        attentions: list(MAX_PROPOSAL_ATTENTIONS, () => ({ type: "x", intent: "open", reason: "r" })),
+      })),
+    },
   };
   assert.ok(protocolElementCount(completion, Infinity) < MAX_TOOL_INPUT_ELEMENTS);
+
+  const rules = list(10, () => ({ kind: "k", match: { a: "a", b: "b", c: "c" }, where: { x: 1 } }));
+  const criterion = { description: "d", rules, any_of: list(10, () => ({ rules })) };
+  const definition = {
+    key: "k",
+    title: "t",
+    definition: {
+      identity: { subject_type: "t", subject_keys: ["a", "b", "c"] },
+      accountable: "a",
+      expectations: "e",
+      include: list(MAX_KINDS_PER_RUN, (index) => `k${index}`),
+      closing: list(20, () => criterion),
+      success: list(20, () => criterion),
+      attention_types: list(20, () => ({ key: "x", description: "d", when: rules, delivery: { route: "r" } })),
+    },
+  };
+  assert.ok(protocolElementCount(definition, Infinity) < MAX_TOOL_INPUT_ELEMENTS);
 });

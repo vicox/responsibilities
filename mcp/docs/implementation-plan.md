@@ -3,9 +3,14 @@
 Status: plan only. Nothing here has been built, provisioned or deployed.
 
 > Written for the standalone repository `repos/responsibilities-mcp`, before the
-> implementation. The service now lives in `mcp/` of the responsibilities repository, next
-> to the core library of D11 (still not used by it); that repository's remote resolves B1.
-> Nothing is provisioned or deployed.
+> implementation. The service now lives in `mcp/` of the responsibilities repository; that
+> repository's remote resolves B1.
+>
+> **Superseded in part by [core-integration-plan.md](core-integration-plan.md) (D11):**
+> responsibilities-core is the service's only decision engine. Its data model and tool
+> contracts replace §4 (domain tables), §5.2–§5.4 (facts, coverage, assessments, case
+> transitions, limits) and §6 (tools). Runs (§5.1), auth, workspaces, OAuth and operations
+> below still apply.
 
 **Tonight:** marks a fact read from `repos/tonight` (paths are relative to `tonight/web/` unless
 stated). **Proposed:** marks a choice made in this plan. Anything that is neither is listed
@@ -675,7 +680,7 @@ Pass = A, B and C all hold.
 | D8 | Retention and deletion of observations, reports and member emails | keep everything during the MVP; decide before a second workspace |
 | D9 | Agent B: Codex CLI, ChatGPT or a Claude routine — whichever has working Bugcrowd and Atlassian MCP access (live run) and can run a planted fixture (§12.A) | verify access first; fall back to a fresh Claude Code session by another member |
 | D10 | How `undetermined` cases that never reappear get closed (the MVP keeps them open) | watch during the MVP; add a person's close command only if they accumulate |
-| D11 | Relation to the existing `repos/responsibilities` core library (`view`/`step`) | not used in the MVP; vocabulary kept compatible |
+| D11 | Relation to the existing `repos/responsibilities` core library (`view`/`step`) | **Decided:** the core is the only decision engine; see [core-integration-plan.md](core-integration-plan.md) |
 
 ## 15. Blockers and risks
 

@@ -1,50 +1,71 @@
 import { randomUUID } from "node:crypto";
 
+import {
+  digest,
+  InputError,
+  step,
+  view,
+  type AttentionEvent,
+  type Definition,
+  type Evaluation,
+  type Observation,
+  type Proposal,
+  type Rejection,
+  type State,
+  type StepResult,
+  type Transition,
+  type View,
+} from "../core.ts";
 import type { SqlDriver } from "../db/driver.ts";
 import { isUuid } from "../workspace/members.ts";
 import {
-  canonicalJson,
-  carryUnknowns,
-  checkAssessments,
-  checkDecision,
-  contentHash,
-  diffFacts,
-  MAX_OPEN_CASES,
-  normaliseFacts,
-  normaliseSources,
+  buildRunObservations,
+  caseIdOf,
+  caseSummary,
+  openCases,
+  openEvidenceIds,
+  recordableKinds,
+  selectLookback,
+  validateDefinition,
+  viewNow,
+  type CaseSummary,
+  type DefinitionInput,
+  type ObservationRef,
+  type RunKind,
+} from "./host.ts";
+import {
+  MAX_KINDS_PER_RUN,
+  MAX_ROWS_PER_CALL,
+  normaliseRows,
   Refusal,
+  refuseUnstorableText,
   RUN_IDLE_MS,
   RUN_LIFETIME_MS,
   RUN_LIMIT,
-  sameJson,
-  transition,
-  type Assessment,
-  type Attention,
-  type Changes,
-  type DecisionInput,
-  type FactValue,
-  type Facts,
-  type ResponsibilityContent,
-  type Source,
+  type Row,
 } from "./model.ts";
 
 /**
  * The responsibilities store, opened for one session: a workspace, the member
- * and the client acting in it (plan §5, §7.5). No method takes a workspace,
- * member or client argument; every query filters by `workspace_id`, and the
- * composite foreign keys make cross-workspace references impossible.
+ * and the client acting in it. It is the host of responsibilities-core
+ * (docs/core-integration-plan.md): auth scope, runs, storage, lookback and the
+ * clock are its own; every decision about cases, status and Attentions is
+ * `view` and `step`. No method takes a workspace, member or client argument;
+ * every query filters by `workspace_id`, and the composite foreign keys make
+ * cross-workspace references impossible.
  *
  * Every write is one transaction that locks what it decides on and re-checks
  * it, so it lands entirely or is refused with nothing written.
  *
- * Lock modes: runs and cases `FOR UPDATE`; responsibility rows
- * `FOR NO KEY UPDATE` (RESPONSIBILITY_LOCK). The latter still serialises
- * `start_run` and `put_responsibility` against each other, but does not conflict
- * with the `FOR KEY SHARE` that inserting a case or a run takes on the
- * responsibility through its foreign key. With `FOR UPDATE` there, a
- * superseding `start_run` (responsibility, then run) and `record_observations`
- * (run, then a new case's foreign key on the responsibility) formed a lock cycle
- * and Postgres aborted one of them with 40P01.
+ * Lock modes: runs `FOR UPDATE`; responsibility rows `FOR NO KEY UPDATE`
+ * (RESPONSIBILITY_LOCK). The latter still serialises `start_run` and
+ * `put_responsibility` against each other, but does not conflict with the
+ * `FOR KEY SHARE` that inserting a run, a stored observation or a state takes on
+ * the responsibility through its foreign key. With `FOR UPDATE` there, a
+ * superseding `start_run` (responsibility, then run) and a write holding the run
+ * that then inserts such a row formed a lock cycle (40P01). The state is
+ * written only by `complete_run`, which holds the run, so it is read without a
+ * lock elsewhere and locked `FOR UPDATE` there.
  */
 const RESPONSIBILITY_LOCK = "FOR NO KEY UPDATE";
 
@@ -66,36 +87,20 @@ export type RunSummary = {
   started_at: string;
   completed_at: string | null;
   outcome: "completed" | "partial" | "failed" | "abandoned" | null;
-  sources: Source[] | null;
   summary: string | null;
-};
-
-export type CaseState = {
-  subject: string;
-  opened_at: string;
-  assessment: string | null;
-  attention: Attention | null;
-  attention_since: string | null;
-  basis: string | null;
-  decided_at: string | null;
-  decided_in_run: string | null;
-  facts?: Facts;
-  facts_observed_at?: string;
 };
 
 export type Context = {
   responsibility: {
     key: string;
     title: string;
-    subject_type: string;
     version: number;
-    expectation: string;
-    assessments: Assessment[];
+    definition: Definition;
     version_created_at: string;
   };
   last_run: RunSummary | null;
   in_progress: RunSummary | null;
-  open_cases: CaseState[];
+  cases: CaseSummary[];
   open_case_count: number;
   truncated: boolean;
 };
@@ -106,101 +111,83 @@ export type StartRunResult = {
   expires_at: string;
   run_limit: number;
   expectation_changed_since_last_run: boolean;
-} & Context;
+  include: string[];
+  attention_types: { key: string; description: string; checked: boolean }[];
+  cases: CaseSummary[];
+};
 
-export type ObservedSubject = {
-  subject: string;
-  case: "new" | "existing";
-  case_status: "open" | "closed";
-  previous: { run_id: string; observed_at: string; agent: Agent } | null;
-  changes: Changes;
-  unchanged: number;
+export type ObservationInput = {
+  kind: string;
+  complete: boolean;
+  replace?: boolean;
+  rows: Record<string, unknown>[];
 };
 
 export type RecordResult = {
   run_id: string;
-  subjects: ObservedSubject[];
-  not_observed_so_far: string[];
+  observations: { kind: string; id: string; rows: number; complete: boolean }[];
+};
+
+export type CompleteInput = {
+  run_id: string;
+  outcome: "completed" | "partial" | "failed";
+  summary?: string;
+  report?: string;
+  evaluation?: { basis: string; proposals: Proposal[] };
 };
 
 export type CompleteResult = {
   run_id: string;
   outcome: "completed" | "partial" | "failed";
   completed_at: string;
-  cases: {
-    subject: string;
-    status: "open" | "closed";
-    attention: "opened" | "continued" | "ended" | "none";
-    attention_since: string | null;
-  }[];
-  not_decided: string[];
-  not_observed: string[];
+  basis: string | null;
+  transitions: Transition[];
+  attention_events: AttentionEvent[];
+  rejections: Rejection[];
+  state_digest: string | null;
   already_completed?: true;
 };
 
-export type CaseHistory = {
-  subject: string;
-  status: "open" | "closed";
-  opened_at: string;
-  closed_at: string | null;
-  close_reason: string | null;
-  attention_since: string | null;
+export type CaseHistory = CaseSummary & {
   history: {
     run: RunSummary;
-    observed_at: string;
-    facts: Facts;
-    decision: {
-      assessment: string;
-      attention: Attention | null;
-      basis: string;
-      cites: string[];
-      status: "open" | "closed";
-      close_reason: string | null;
-    } | null;
+    at: string;
+    transitions: Transition[];
+    attention_events: AttentionEvent[];
+    proposal: Proposal | null;
+    cited: string[];
   }[];
 };
 
 export type ResponsibilityStore = {
-  putResponsibility(input: { key: string } & ResponsibilityContent): Promise<{
+  putResponsibility(input: { key: string; title: string; definition: DefinitionInput }): Promise<{
     key: string;
     version: number;
     changed: boolean;
     previous_version: number | null;
   }>;
-  getResponsibility(key: string, includeFacts: boolean): Promise<Context>;
+  getResponsibility(key: string): Promise<Context>;
   startRun(input: { responsibility: string; agent: Agent; supersede: boolean }): Promise<StartRunResult>;
-  recordObservations(input: {
-    run_id: string;
-    sources?: Source[];
-    subjects: { subject: string; facts: Record<string, unknown> }[];
-  }): Promise<RecordResult>;
-  completeRun(input: {
-    run_id: string;
-    outcome: "completed" | "partial" | "failed";
-    summary?: string;
-    report?: string;
-    decisions: DecisionInput[];
-  }): Promise<CompleteResult>;
-  getCase(input: { responsibility: string; subject: string; limit: number }): Promise<CaseHistory>;
+  recordObservations(input: { run_id: string; observations: ObservationInput[] }): Promise<RecordResult>;
+  viewRun(input: { run_id: string }): Promise<View>;
+  completeRun(input: CompleteInput): Promise<CompleteResult>;
+  getCase(input: { responsibility: string; keys: Record<string, string | number>; limit: number }): Promise<CaseHistory>;
 };
 
 type Q = Pick<SqlDriver, "query">;
 
 const COMPLETED = `('completed', 'partial', 'failed')`;
 
-/**
- * A case is part of the baseline only once a completed run has observed it. A
- * case opened by a run that was then abandoned (superseded, idle or expired) keeps its
- * rows, but stays out of open cases, counts, not-observed lists and case
- * history until a completed run observes it. `alias` is the cases alias.
- */
-function inBaseline(alias: string): string {
-  return `EXISTS (
-    SELECT 1 FROM observations bo
-      JOIN runs br ON br.workspace_id = bo.workspace_id AND br.id = bo.run_id
-     WHERE bo.workspace_id = ${alias}.workspace_id AND bo.case_id = ${alias}.id
-       AND br.outcome IN ${COMPLETED})`;
-}
+/** The inputs of one `view` or `step` for a run, read under its lock (plan §4.3, §4.4). */
+type StepInputs = {
+  definition: Definition;
+  state: State | null;
+  stateDigest: string | null;
+  /** This run's observations (lookback a), as `complete_run` freezes them. */
+  runObservations: Observation[];
+  /** Everything passed to the core: (a) ∪ (b) ∪ (c). */
+  observations: Observation[];
+};
 
 export function responsibilityStore(
   driver: SqlDriver,
@@ -232,10 +219,7 @@ export function responsibilityStore(
     version_id: string;
     version: number;
     title: string;
-    subject_type: string;
-    expectation: string;
-    assessments: Assessment[];
-    content_hash: string;
+    definition: Definition;
     version_created_at: Date;
   };
 
@@ -246,8 +230,8 @@ export function responsibilityStore(
     );
     if (!found) throw await unknownResponsibility(q, key);
     const [row] = await q.query<ResponsibilityRow>(
-      `SELECT r.id, r.key, v.id AS version_id, v.version, v.title, v.subject_type, v.expectation,
-              v.assessments, v.content_hash, v.created_at AS version_created_at
+      `SELECT r.id, r.key, v.id AS version_id, v.version, v.title, v.definition,
+              v.created_at AS version_created_at
          FROM responsibilities r
          JOIN responsibility_versions v ON v.workspace_id = r.workspace_id AND v.responsibility_id = r.id
         WHERE r.workspace_id = $1 AND r.id = $2
@@ -259,9 +243,30 @@ export function responsibilityStore(
     return row;
   }
 
+  async function definitionOf(q: Q, versionId: string): Promise<Definition> {
+    const [row] = await q.query<{ definition: Definition }>(
+      `SELECT definition FROM responsibility_versions WHERE workspace_id = $1 AND id = $2`,
+      [ws, versionId],
+    );
+    return row.definition;
+  }
+
+  async function loadState(
+    q: Q,
+    responsibilityId: string,
+    lock: boolean,
+  ): Promise<{ state: State | null; digest: string | null }> {
+    const [row] = await q.query<{ state: State; state_digest: string }>(
+      `SELECT state, state_digest FROM responsibility_states
+        WHERE workspace_id = $1 AND responsibility_id = $2${lock ? " FOR UPDATE" : ""}`,
+      [ws, responsibilityId],
+    );
+    return { state: row?.state ?? null, digest: row?.state_digest ?? null };
+  }
+
   const RUN_SUMMARY_COLUMNS = `
     r.id AS run_id, m.email AS by, r.client_name, r.agent, v.version, r.version_id,
-    r.started_at, r.completed_at, r.outcome, r.sources, r.summary`;
+    r.started_at, r.completed_at, r.outcome, r.summary`;
   const RUN_SUMMARY_JOINS = `
     JOIN members m ON m.workspace_id = r.workspace_id AND m.id = r.member_id
     JOIN responsibility_versions v ON v.workspace_id = r.workspace_id AND v.id = r.version_id`;
@@ -276,7 +281,6 @@ export function responsibilityStore(
     started_at: Date;
     completed_at: Date | null;
     outcome: RunSummary["outcome"];
-    sources: Source[] | null;
     summary: string | null;
   };
 
@@ -290,7 +294,6 @@ export function responsibilityStore(
       started_at: iso(row.started_at),
       completed_at: row.completed_at ? iso(row.completed_at) : null,
       outcome: row.outcome,
-      sources: row.sources,
       summary: row.summary,
     };
   }
@@ -316,97 +319,6 @@ export function responsibilityStore(
     return row;
   }
 
-  async function context(q: Q, responsibility: ResponsibilityRow, includeFacts: boolean, now: Date): Promise<Context> {
-    const last = await lastCompletedRun(q, responsibility.id);
-    const open = await openRunSummary(q, responsibility.id, now);
-
-    const [{ count }] = await q.query<{ count: number }>(
-      `SELECT count(*)::int AS count FROM cases c
-        WHERE c.workspace_id = $1 AND c.responsibility_id = $2 AND c.status = 'open'
-          AND ${inBaseline("c")}`,
-      [ws, responsibility.id],
-    );
-
-    const rows = await q.query<{
-      subject: string;
-      opened_at: Date;
-      attention_since: Date | null;
-      assessment: string | null;
-      attention: Attention | null;
-      basis: string | null;
-      decided_at: Date | null;
-      decided_in_run: string | null;
-      facts: Facts | null;
-      facts_observed_at: Date | null;
-    }>(
-      `SELECT c.subject, c.opened_at, c.attention_since,
-              d.assessment, d.attention, d.basis, d.decided_at, d.run_id AS decided_in_run,
-              ${includeFacts ? "o.facts, o.observed_at AS facts_observed_at" : "NULL::jsonb AS facts, NULL::timestamptz AS facts_observed_at"}
-         FROM cases c
-         LEFT JOIN LATERAL (
-           SELECT d.assessment, d.attention, d.basis, d.decided_at, d.run_id
-             FROM decisions d
-            WHERE d.workspace_id = c.workspace_id AND d.case_id = c.id
-            ORDER BY d.decided_at DESC, d.run_id
-            LIMIT 1
-         ) d ON true
-         ${
-           includeFacts
-             ? `LEFT JOIN LATERAL (
-                  SELECT o.facts, o.observed_at
-                    FROM observations o
-                    JOIN runs r ON r.workspace_id = o.workspace_id AND r.id = o.run_id
-                   WHERE o.workspace_id = c.workspace_id AND o.case_id = c.id
-                     AND r.outcome IN ${COMPLETED}
-                   ORDER BY r.completed_at DESC, r.id
-                   LIMIT 1
-                ) o ON true`
-             : ""
-         }
-        WHERE c.workspace_id = $1 AND c.responsibility_id = $2 AND c.status = 'open'
-          AND ${inBaseline("c")}
-        ORDER BY (c.attention_since IS NULL), c.attention_since, c.subject COLLATE "C"
-        LIMIT $3`,
-      [ws, responsibility.id, MAX_OPEN_CASES + 1],
-    );
-
-    const truncated = rows.length > MAX_OPEN_CASES;
-    const open_cases = rows.slice(0, MAX_OPEN_CASES).map((row): CaseState => {
-      const state: CaseState = {
-        subject: row.subject,
-        opened_at: iso(row.opened_at),
-        assessment: row.assessment,
-        attention: row.attention,
-        attention_since: row.attention_since ? iso(row.attention_since) : null,
-        basis: row.basis,
-        decided_at: row.decided_at ? iso(row.decided_at) : null,
-        decided_in_run: row.decided_in_run,
-      };
-      if (includeFacts && row.facts && row.facts_observed_at) {
-        state.facts = row.facts;
-        state.facts_observed_at = iso(row.facts_observed_at);
-      }
-      return state;
-    });
-
-    return {
-      responsibility: {
-        key: responsibility.key,
-        title: responsibility.title,
-        subject_type: responsibility.subject_type,
-        version: responsibility.version,
-        expectation: responsibility.expectation,
-        assessments: responsibility.assessments,
-        version_created_at: iso(responsibility.version_created_at),
-      },
-      last_run: last ? runSummary(last) : null,
-      in_progress: open ? runSummary(open) : null,
-      open_cases,
-      open_case_count: count,
-      truncated,
-    };
-  }
-
   // --- runs: lock and check --------------------------------------------------------
 
   type RunRow = {
@@ -415,8 +327,10 @@ export function responsibilityStore(
     version_id: string;
     member_id: string;
     client_id: string;
+    agent: Agent;
     started_at: Date;
-    sources: Source[] | null;
+    view_now: Date | null;
+    view_basis: string | null;
     completed_at: Date | null;
     outcome: string | null;
     summary: string | null;
@@ -428,8 +342,8 @@ export function responsibilityStore(
     const unknown = new Refusal("unknown_run", `There is no run ${runId} in this workspace.`, { run_id: runId });
     if (!isUuid(runId)) throw unknown;
     const [run] = await q.query<RunRow>(
-      `SELECT id, responsibility_id, version_id, member_id, client_id, started_at, sources,
-              completed_at, outcome, summary, completion
+      `SELECT id, responsibility_id, version_id, member_id, client_id, agent, started_at,
+              view_now, view_basis, completed_at, outcome, summary, completion
          FROM runs WHERE workspace_id = $1 AND id = $2
          FOR UPDATE`,
       [ws, runId],
@@ -453,9 +367,9 @@ export function responsibilityStore(
    * When the next `start_run` may take the open run over: RUN_IDLE_MS after its
    * last activity, and never later than its lifetime. Its own writes renew it.
    *
-   * A run started before `last_active_at` existed has none, and its writes up to
-   * then left no trace of when they happened, so it is held for its whole
-   * lifetime as before — until a write of this code gives it an activity time.
+   * A run without `last_active_at` has left no trace of when its writes
+   * happened, so it is held for its whole lifetime — until a write of this code
+   * gives it an activity time.
    */
   function reclaimableAt(run: { started_at: Date; last_active_at: Date | null }): Date {
     if (!run.last_active_at) return expiresAt(run);
@@ -496,83 +410,98 @@ export function responsibilityStore(
     }
   }
 
-  /**
-   * Maps subjects to their cases with Postgres' own `lower()` on both sides — the
-   * same function the `cases_subject` index uses — and refuses two subjects that
-   * fold together.
-   */
-  async function mapSubjects(
-    q: Q,
-    responsibilityId: string,
-    runId: string,
-    subjects: string[],
-  ): Promise<
-    {
-      input: string;
-      case_id: string | null;
-      status: "open" | "closed" | null;
-      attention_since: Date | null;
-      observed_in_run: boolean;
-    }[]
-  > {
-    const rows = await q.query<{
-      ord: number;
-      input: string;
-      fold: string;
-      case_id: string | null;
-      status: "open" | "closed" | null;
-      attention_since: Date | null;
-      observed_in_run: boolean;
-    }>(
-      `SELECT s.ord::int AS ord, s.input, lower(s.input) AS fold, c.id AS case_id, c.status, c.attention_since,
-              (o.case_id IS NOT NULL) AS observed_in_run
-         FROM unnest($3::text[]) WITH ORDINALITY AS s(input, ord)
-         LEFT JOIN cases c
-           ON c.workspace_id = $1 AND c.responsibility_id = $2 AND lower(c.subject) = lower(s.input)
-         LEFT JOIN observations o
-           ON o.workspace_id = c.workspace_id AND o.run_id = $4 AND o.case_id = c.id
-        ORDER BY s.ord`,
-      [ws, responsibilityId, subjects, runId],
-    );
-    const seen = new Set<string>();
-    for (const row of rows) {
-      if (seen.has(row.fold)) {
-        throw new Refusal("duplicate_subject", `${row.input} appears more than once in this call.`, {
-          subject: row.input,
-        });
-      }
-      seen.add(row.fold);
+  function refuseIfCompleted(run: RunRow): void {
+    if (run.completion) {
+      throw new Refusal("run_completed", "This run is completed and immutable.", { run_id: run.id });
     }
-    return rows;
   }
 
-  async function notObserved(q: Q, responsibilityId: string, runId: string): Promise<string[]> {
-    const rows = await q.query<{ subject: string }>(
-      `SELECT c.subject FROM cases c
-        WHERE c.workspace_id = $1 AND c.responsibility_id = $2 AND c.status = 'open'
-          AND ${inBaseline("c")}
-          AND NOT EXISTS (
-            SELECT 1 FROM observations o
-             WHERE o.workspace_id = c.workspace_id AND o.run_id = $3 AND o.case_id = c.id)
-        ORDER BY c.subject COLLATE "C"`,
-      [ws, responsibilityId, runId],
+  // --- the core's inputs for a run ----------------------------------------------------
+
+  /**
+   * Definition, state and observations for `view` and `step` of a run, built by
+   * the same functions for `view_run` and `complete_run`. While the run holds
+   * its lock nothing else adds stored observations or changes the state, so the
+   * result is the same at both, unless a recording changed the run.
+   */
+  async function stepInputs(q: Q, run: RunRow, lockState: boolean): Promise<StepInputs> {
+    const definition = await definitionOf(q, run.version_id);
+    const { state, digest: stateDigest } = await loadState(q, run.responsibility_id, lockState);
+
+    const kinds = await q.query<RunKind>(
+      `SELECT kind, complete, recorded_at FROM run_observation_kinds
+        WHERE workspace_id = $1 AND run_id = $2`,
+      [ws, run.id],
     );
-    return rows.map((row) => row.subject);
+    const rows = new Map<string, { digest: string; row: Row }[]>();
+    for (const one of await q.query<{ kind: string; row_digest: string; row: Row }>(
+      `SELECT kind, row_digest, row FROM run_rows WHERE workspace_id = $1 AND run_id = $2`,
+      [ws, run.id],
+    )) {
+      rows.set(one.kind, [...(rows.get(one.kind) ?? []), { digest: one.row_digest, row: one.row }]);
+    }
+
+    const wanted = [...new Set([...recordableKinds(definition), ...kinds.map((k) => k.kind)])];
+    const newestStored = (
+      await q.query<{ id: string; kind: string; occurred_at: Date }>(
+        `SELECT DISTINCT ON (kind) id, kind, occurred_at FROM core_observations
+          WHERE workspace_id = $1 AND responsibility_id = $2 AND kind = ANY($3::text[])
+          ORDER BY kind, occurred_at DESC, id COLLATE "C" DESC`,
+        [ws, run.responsibility_id, wanted],
+      )
+    ).map(ref);
+    const runObservations = buildRunObservations(
+      run.id,
+      kinds,
+      rows,
+      definition.identity,
+      new Map(newestStored.map((o) => [o.kind, o])),
+    );
+
+    const evidenceIds = openEvidenceIds(state);
+    const evidence = evidenceIds.length
+      ? (
+          await q.query<{ id: string; kind: string; occurred_at: Date }>(
+            `SELECT id, kind, occurred_at FROM core_observations
+              WHERE workspace_id = $1 AND responsibility_id = $2 AND id = ANY($3::text[])`,
+            [ws, run.responsibility_id, evidenceIds],
+          )
+        ).map(ref)
+      : [];
+
+    const selected = selectLookback(state, definition, runObservations, evidence, newestStored);
+    const own = new Set(runObservations.map((o) => o.id));
+    const storedIds = selected.filter((id) => !own.has(id));
+    const stored = storedIds.length
+      ? (
+          await q.query<{ body: Observation }>(
+            `SELECT body FROM core_observations
+              WHERE workspace_id = $1 AND responsibility_id = $2 AND id = ANY($3::text[])`,
+            [ws, run.responsibility_id, storedIds],
+          )
+        ).map((row) => row.body)
+      : [];
+
+    return { definition, state, stateDigest, runObservations, observations: [...runObservations, ...stored] };
+  }
+
+  /** The core's view of these inputs at `now`, or `undefined` if the core refuses them. */
+  function viewOrNothing(inputs: StepInputs, now: string): View | undefined {
+    try {
+      return view(inputs.definition, inputs.state, inputs.observations, now);
+    } catch (error) {
+      if (error instanceof InputError) return undefined;
+      throw error;
+    }
   }
 
   // --- operations ------------------------------------------------------------------
 
   return {
     async putResponsibility(input) {
-      checkAssessments(input.assessments);
-      const content: ResponsibilityContent = {
-        title: input.title,
-        subject_type: input.subject_type,
-        expectation: input.expectation,
-        assessments: input.assessments.map(({ label, attention }) => ({ label, attention })),
-      };
-      const hash = contentHash(content);
+      refuseUnstorableText({ title: input.title, definition: input.definition });
       const now = clock();
+      const hash = digest({ title: input.title, definition: input.definition });
 
       return driver.transaction(async (tx) => {
         await tx.query(
@@ -584,41 +513,59 @@ export function responsibilityStore(
           `SELECT id FROM responsibilities WHERE workspace_id = $1 AND key = $2 ${RESPONSIBILITY_LOCK}`,
           [ws, input.key],
         );
-        const [current] = await tx.query<{ version: number; content_hash: string }>(
-          `SELECT version, content_hash FROM responsibility_versions
+        const [current] = await tx.query<{ version: number; content_hash: string; definition: Definition }>(
+          `SELECT version, content_hash, definition FROM responsibility_versions
             WHERE workspace_id = $1 AND responsibility_id = $2
             ORDER BY version DESC LIMIT 1`,
           [ws, locked.id],
         );
-        if (current && current.content_hash === hash) {
-          return { key: input.key, version: current.version, changed: false, previous_version: current.version };
-        }
         const version = (current?.version ?? 0) + 1;
+        const definition = validateDefinition(input.definition, locked.id, version, now);
+        if (current) {
+          // The state is bound to one subject_type and set of subject_keys (src/core.ts, identity digest).
+          const before = current.definition.identity;
+          const after = definition.identity;
+          const keys = (list: string[]) => JSON.stringify([...list].sort());
+          if (before.subject_type !== after.subject_type || keys(before.subject_keys) !== keys(after.subject_keys)) {
+            throw new Refusal(
+              "identity_change",
+              "identity.subject_type and the set of subject_keys cannot change: cases are bound to them. " +
+                "Define a new responsibility instead.",
+              { identity: before },
+            );
+          }
+          if (current.content_hash === hash) {
+            return { key: input.key, version: current.version, changed: false, previous_version: current.version };
+          }
+        }
         await tx.query(
           `INSERT INTO responsibility_versions
-             (workspace_id, responsibility_id, version, title, subject_type, expectation,
-              assessments, content_hash, created_by, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)`,
-          [
-            ws,
-            locked.id,
-            version,
-            content.title,
-            content.subject_type,
-            content.expectation,
-            JSON.stringify(content.assessments),
-            hash,
-            scope.memberId,
-            now,
-          ],
+             (workspace_id, responsibility_id, version, title, definition, content_hash, created_by, created_at)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
+          [ws, locked.id, version, input.title, JSON.stringify(definition), hash, scope.memberId, now],
         );
         return { key: input.key, version, changed: true, previous_version: current?.version ?? null };
       });
     },
 
-    async getResponsibility(key, includeFacts) {
+    async getResponsibility(key) {
       const responsibility = await responsibilityByKey(driver, key, false);
-      return context(driver, responsibility, includeFacts, clock());
+      const now = clock();
+      const last = await lastCompletedRun(driver, responsibility.id);
+      const open = await openRunSummary(driver, responsibility.id, now);
+      const { state } = await loadState(driver, responsibility.id, false);
+      return {
+        responsibility: {
+          key: responsibility.key,
+          title: responsibility.title,
+          version: responsibility.version,
+          definition: responsibility.definition,
+          version_created_at: iso(responsibility.version_created_at),
+        },
+        last_run: last ? runSummary(last) : null,
+        in_progress: open ? runSummary(open) : null,
+        ...openCases(state),
+      };
     },
 
     async startRun({ responsibility: key, agent, supersede }) {
@@ -626,8 +573,8 @@ export function responsibilityStore(
         const responsibility = await responsibilityByKey(tx, key, true);
         const runId = randomUUID();
 
-        // last_active_at comes from the locked row itself: a record_observations
-        // that renewed it and committed while this waited for the lock is seen.
+        // last_active_at comes from the locked row itself: a write that renewed
+        // it and committed while this waited for the lock is seen.
         const [open] = await tx.query<{ id: string; started_at: Date; last_active_at: Date | null }>(
           `SELECT id, started_at, last_active_at FROM runs
             WHERE workspace_id = $1 AND responsibility_id = $2 AND completed_at IS NULL
@@ -691,7 +638,8 @@ export function responsibilityStore(
         );
 
         const last = await lastCompletedRun(tx, responsibility.id);
-        const ctx = await context(tx, responsibility, true, now);
+        const { state } = await loadState(tx, responsibility.id, false);
+        const definition = responsibility.definition;
         await renew(tx, runId);
         return {
           run_id: runId,
@@ -699,18 +647,31 @@ export function responsibilityStore(
           expires_at: iso(expiresAt({ started_at: now })),
           run_limit: RUN_LIMIT,
           expectation_changed_since_last_run: last !== undefined && last.version_id !== responsibility.version_id,
-          ...ctx,
+          include: definition.include,
+          attention_types: (definition.attention_types ?? []).map((type) => ({
+            key: type.key,
+            description: type.description,
+            checked: type.when !== undefined,
+          })),
+          cases: openCases(state).cases,
         };
       });
     },
 
     async recordObservations(input) {
-      // Facts are validated before the database is touched.
-      const normalised = input.subjects.map((entry) => ({
-        subject: entry.subject,
-        facts: normaliseFacts(entry.subject, entry.facts),
+      // Rows are checked and digested before the database is touched.
+      const entries = input.observations.map((entry) => ({
+        kind: entry.kind,
+        complete: entry.complete,
+        replace: entry.replace ?? false,
+        rows: normaliseRows(entry.kind, entry.rows).map((row) => ({ digest: digest(row), row })),
       }));
-      const declared = input.sources ? normaliseSources(input.sources) : undefined;
+      const total = entries.reduce((sum, entry) => sum + entry.rows.length, 0);
+      if (total > MAX_ROWS_PER_CALL) {
+        throw new Refusal("call_too_large", `At most ${MAX_ROWS_PER_CALL} rows per call; this call has ${total}.`, {
+          rows: total,
+        });
+      }
 
       return driver.transaction(async (tx) => {
         const run = await lockOwnRun(tx, input.run_id);
@@ -718,379 +679,393 @@ export function responsibilityStore(
         // the hold itself is stamped at the very end (renew).
         const now = clock();
         refuseIfAbandoned(run);
-        if (run.completion) {
-          throw new Refusal("run_completed", "This run is completed and immutable.", { run_id: run.id });
-        }
+        refuseIfCompleted(run);
         refuseIfExpired(run, now);
 
-        let sources = run.sources;
-        if (declared) {
-          if (!sources) {
-            sources = declared;
-            await tx.query(`UPDATE runs SET sources = $3::jsonb WHERE workspace_id = $1 AND id = $2`, [
-              ws,
-              run.id,
-              canonicalJson(declared),
-            ]);
-          } else if (!sameJson(sources, declared)) {
+        const recordable = recordableKinds(await definitionOf(tx, run.version_id));
+        const kinds = new Map(
+          (
+            await tx.query<{ kind: string; complete: boolean }>(
+              `SELECT kind, complete FROM run_observation_kinds WHERE workspace_id = $1 AND run_id = $2`,
+              [ws, run.id],
+            )
+          ).map((row) => [row.kind, row.complete]),
+        );
+
+        let changed = false;
+        const counts = new Map<string, number>();
+        for (const entry of entries) {
+          if (!recordable.includes(entry.kind)) {
             throw new Refusal(
-              "sources_conflict",
-              "This run already declared different sources; sources are immutable for a run.",
-              { declared: sources },
+              "unknown_kind",
+              `${entry.kind} is neither included in this run's version nor read by one of its rules.`,
+              { kind: entry.kind, kinds: recordable },
             );
           }
-        } else if (!sources) {
-          throw new Refusal(
-            "sources_required",
-            "The first record_observations of a run must declare its sources.",
-            { run_id: run.id },
-          );
+          const known = kinds.get(entry.kind);
+          if (known !== undefined && known !== entry.complete) {
+            throw new Refusal(
+              "observation_conflict",
+              `This run recorded ${entry.kind} as complete: ${known}; whether a kind is complete is fixed for a run.`,
+              { kind: entry.kind, complete: known },
+            );
+          }
+
+          let before = new Set<string>();
+          if (known === undefined) {
+            if (kinds.size >= MAX_KINDS_PER_RUN) {
+              throw new Refusal("run_too_large", `A run records at most ${MAX_KINDS_PER_RUN} kinds.`, {
+                kinds: [...kinds.keys()],
+              });
+            }
+            await tx.query(
+              `INSERT INTO run_observation_kinds (workspace_id, run_id, kind, complete, recorded_at)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [ws, run.id, entry.kind, entry.complete, now],
+            );
+            kinds.set(entry.kind, entry.complete);
+            changed = true;
+          } else {
+            before = new Set(
+              (
+                await tx.query<{ row_digest: string }>(
+                  `SELECT row_digest FROM run_rows WHERE workspace_id = $1 AND run_id = $2 AND kind = $3`,
+                  [ws, run.id, entry.kind],
+                )
+              ).map((row) => row.row_digest),
+            );
+          }
+
+          // Rows are a set: the same row again changes nothing.
+          const after = new Set(entry.replace ? [] : before);
+          const added = new Map<string, Row>();
+          for (const { digest: d, row } of entry.rows) {
+            after.add(d);
+            if (!before.has(d)) added.set(d, row);
+          }
+          if (after.size > RUN_LIMIT) {
+            throw new Refusal(
+              "run_too_large",
+              `A run records at most ${RUN_LIMIT} rows of one kind; ${entry.kind} would have ${after.size}.`,
+              { kind: entry.kind, run_limit: RUN_LIMIT },
+            );
+          }
+          const removed = [...before].filter((d) => !after.has(d));
+          if (removed.length) {
+            await tx.query(
+              `DELETE FROM run_rows
+                WHERE workspace_id = $1 AND run_id = $2 AND kind = $3 AND row_digest = ANY($4::text[])`,
+              [ws, run.id, entry.kind, removed],
+            );
+          }
+          if (added.size) {
+            await tx.query(
+              `INSERT INTO run_rows (workspace_id, run_id, kind, row_digest, row)
+               SELECT $1, $2, $3, t.row_digest, t.row::jsonb
+                 FROM unnest($4::text[], $5::text[]) AS t(row_digest, row)`,
+              [ws, run.id, entry.kind, [...added.keys()], [...added.values()].map((row) => JSON.stringify(row))],
+            );
+          }
+          if (known !== undefined && (removed.length || added.size)) {
+            await tx.query(
+              `UPDATE run_observation_kinds SET recorded_at = $4
+                WHERE workspace_id = $1 AND run_id = $2 AND kind = $3`,
+              [ws, run.id, entry.kind, now],
+            );
+            changed = true;
+          }
+          counts.set(entry.kind, after.size);
         }
 
-        const mapped = await mapSubjects(
-          tx,
-          run.responsibility_id,
-          run.id,
-          normalised.map((entry) => entry.subject),
-        );
-
-        const [{ count: observed }] = await tx.query<{ count: number }>(
-          `SELECT count(*)::int AS count FROM observations WHERE workspace_id = $1 AND run_id = $2`,
-          [ws, run.id],
-        );
-        const added = mapped.filter((row) => !row.observed_in_run).length;
-        if (observed + added > RUN_LIMIT) {
-          throw new Refusal(
-            "run_too_large",
-            `A run observes at most ${RUN_LIMIT} distinct subjects; this call would make ${observed + added}.`,
-            { run_limit: RUN_LIMIT, observed },
-          );
+        // A changed observation invalidates the last view: complete_run then needs a new one.
+        if (changed) {
+          await tx.query(`UPDATE runs SET view_now = NULL, view_basis = NULL WHERE workspace_id = $1 AND id = $2`, [
+            ws,
+            run.id,
+          ]);
         }
-
-        // New cases, opened by their first observation.
-        const fresh = mapped.filter((row) => row.case_id === null).map((row) => row.input);
-        const created = new Map<string, { id: string; status: "open" | "closed" }>();
-        if (fresh.length) {
-          const rows = await tx.query<{ id: string; subject: string; status: "open" | "closed" }>(
-            `INSERT INTO cases (workspace_id, responsibility_id, subject, opened_at)
-             SELECT $1, $2, s, $4 FROM unnest($3::text[]) AS s
-             RETURNING id, subject, status`,
-            [ws, run.responsibility_id, fresh, now],
-          );
-          for (const row of rows) created.set(row.subject, { id: row.id, status: row.status });
-        }
-        const caseIds = mapped.map((row) => row.case_id ?? created.get(row.input)!.id);
-
-        const previousRows = await tx.query<{
-          case_id: string;
-          run_id: string;
-          observed_at: Date;
-          facts: Facts;
-          agent: Agent;
-        }>(
-          `SELECT DISTINCT ON (o.case_id) o.case_id, o.run_id, o.observed_at, o.facts, r.agent
-             FROM observations o
-             JOIN runs r ON r.workspace_id = o.workspace_id AND r.id = o.run_id
-            WHERE o.workspace_id = $1 AND o.case_id = ANY($2::uuid[]) AND r.outcome IN ${COMPLETED}
-            ORDER BY o.case_id, r.completed_at DESC, r.id`,
-          [ws, caseIds],
-        );
-        // A case is "existing" once a completed run has observed it; one seen only
-        // by abandoned runs (or only by this run) is still "new".
-        const previous = new Map(previousRows.map((row) => [row.case_id, row]));
-
-        const subjects: ObservedSubject[] = [];
-        const stored: string[] = [];
-        normalised.forEach((entry, index) => {
-          const caseId = caseIds[index];
-          const before = previous.get(caseId);
-          const facts = carryUnknowns(before?.facts ?? null, entry.facts, sources!);
-          const { changes, unchanged } = diffFacts(before?.facts ?? null, facts);
-          stored.push(canonicalJson(facts));
-          subjects.push({
-            subject: entry.subject,
-            case: before ? "existing" : "new",
-            case_status: mapped[index].status ?? created.get(entry.subject)!.status,
-            previous: before
-              ? { run_id: before.run_id, observed_at: iso(before.observed_at), agent: before.agent }
-              : null,
-            changes,
-            unchanged,
-          });
-        });
-
-        if (caseIds.length) {
-          await tx.query(
-            `INSERT INTO observations (workspace_id, run_id, case_id, facts, observed_at)
-             SELECT $1, $2, t.case_id, t.facts::jsonb, $5
-               FROM unnest($3::uuid[], $4::text[]) AS t(case_id, facts)
-             ON CONFLICT (workspace_id, run_id, case_id)
-             DO UPDATE SET facts = EXCLUDED.facts, observed_at = EXCLUDED.observed_at`,
-            [ws, run.id, caseIds, stored, now],
-          );
-        }
-
-        const notObservedSoFar = await notObserved(tx, run.responsibility_id, run.id);
-        // An accepted call, with or without subjects, keeps the run held (RUN_IDLE_MS).
+        // An accepted call, changed or not, keeps the run held (RUN_IDLE_MS).
         await renew(tx, run.id);
-        return { run_id: run.id, subjects, not_observed_so_far: notObservedSoFar };
+        return {
+          run_id: run.id,
+          observations: [...counts].map(([kind, rows]) => ({
+            kind,
+            id: `${run.id}:${kind}`,
+            rows,
+            complete: kinds.get(kind)!,
+          })),
+        };
+      });
+    },
+
+    async viewRun({ run_id }) {
+      return driver.transaction(async (tx) => {
+        const run = await lockOwnRun(tx, run_id);
+        const now = clock();
+        refuseIfAbandoned(run);
+        refuseIfCompleted(run);
+        refuseIfExpired(run, now);
+
+        const inputs = await stepInputs(tx, run, false);
+        // A valid snapshot is delivered again as it was, without a new time.
+        if (run.view_now && run.view_basis) {
+          const again = viewOrNothing(inputs, iso(run.view_now));
+          if (again?.basis === run.view_basis) {
+            await renew(tx, run.id);
+            return again;
+          }
+        }
+        const at = viewNow(now, inputs.state, inputs.observations);
+        const fresh = viewOrNothing(inputs, at);
+        if (!fresh) {
+          throw new Refusal("invalid_input", "The stored inputs of this run are not valid core input.", {
+            run_id: run.id,
+          });
+        }
+        await tx.query(`UPDATE runs SET view_now = $3, view_basis = $4 WHERE workspace_id = $1 AND id = $2`, [
+          ws,
+          run.id,
+          at,
+          fresh.basis,
+        ]);
+        await renew(tx, run.id);
+        return fresh;
       });
     },
 
     async completeRun(input) {
-      const now = clock();
+      refuseUnstorableText({ summary: input.summary, report: input.report, evaluation: input.evaluation });
+
       return driver.transaction(async (tx) => {
         const run = await lockOwnRun(tx, input.run_id);
+        const now = clock();
         refuseIfAbandoned(run);
         // A repeat by the same member and client gets the stored result back,
-        // before the lifetime is looked at (plan §5.1).
+        // before the lifetime is looked at.
         if (run.completion) return { ...run.completion, already_completed: true as const };
         refuseIfExpired(run, now);
-        if (!run.sources) {
+
+        // The completion order, which last_run and get_case read, is the order of the
+        // steps: strictly after the responsibility's previous completion, even if the
+        // host clock went back. Completions of one responsibility never overlap — only
+        // its one open run can complete, and this transaction holds it.
+        const [{ previous }] = await tx.query<{ previous: Date | null }>(
+          `SELECT max(completed_at) AS previous FROM runs
+            WHERE workspace_id = $1 AND responsibility_id = $2 AND outcome IN ${COMPLETED}`,
+          [ws, run.responsibility_id],
+        );
+        const completedAt = previous && previous >= now ? new Date(previous.getTime() + 1) : now;
+
+        const finish = async (result: CompleteResult) => {
+          await tx.query(
+            `UPDATE runs SET completed_at = $3, outcome = $4, summary = $5, report = $6, completion = $7::jsonb
+              WHERE workspace_id = $1 AND id = $2`,
+            [ws, run.id, completedAt, input.outcome, input.summary ?? null, input.report ?? null, JSON.stringify(result)],
+          );
+          return result;
+        };
+
+        if (input.outcome === "failed") {
+          if (!input.summary) {
+            throw new Refusal("summary_required", "A failed run needs a summary saying why.", { run_id: run.id });
+          }
+          if (input.evaluation) {
+            throw new Refusal("evaluation_forbidden", "A failed run takes no evaluation; nothing is stepped.", {
+              run_id: run.id,
+            });
+          }
+          return finish({
+            run_id: run.id,
+            outcome: "failed",
+            completed_at: iso(completedAt),
+            basis: null,
+            transitions: [],
+            attention_events: [],
+            rejections: [],
+            state_digest: null,
+          });
+        }
+
+        if (!input.evaluation) {
           throw new Refusal(
-            "sources_required",
-            "A run declares its sources (record_observations) before it completes.",
+            "evaluation_required",
+            `A ${input.outcome} run completes with an evaluation {basis, proposals} of its view_run.`,
             { run_id: run.id },
           );
         }
-        if (input.outcome === "failed" && !input.summary) {
-          throw new Refusal("summary_required", "A failed run needs a summary saying why.", { run_id: run.id });
+        if (!run.view_now || !run.view_basis) {
+          throw new Refusal(
+            "view_required",
+            "There is no current view of this run: call view_run (again, after recording) and evaluate that view.",
+            { run_id: run.id },
+          );
+        }
+        // Checked by the host itself: with no proposals, `step` would take any basis silently.
+        if (input.evaluation.basis !== run.view_basis) {
+          throw new Refusal(
+            "basis_mismatch",
+            "evaluation.basis is not the basis of the last view_run of this run; copy it from that view.",
+            { expected: run.view_basis, received: input.evaluation.basis },
+          );
         }
 
-        const [version] = await tx.query<{ assessments: Assessment[] }>(
-          `SELECT assessments FROM responsibility_versions WHERE workspace_id = $1 AND id = $2`,
-          [ws, run.version_id],
-        );
-        const mapped = await mapSubjects(
-          tx,
-          run.responsibility_id,
-          run.id,
-          input.decisions.map((decision) => decision.subject),
-        );
-        const labels = input.decisions.map((decision) => checkDecision(decision, version.assessments));
-        mapped.forEach((row) => {
-          if (!row.case_id || !row.observed_in_run) {
-            throw new Refusal(
-              "unobserved_subject",
-              `${row.input} was not observed in this run; record it before deciding it.`,
-              { subject: row.input },
-            );
-          }
-        });
-        const caseIds = mapped.map((row) => row.case_id!);
-
-        // Lock the decided cases in case-id order, then read them as locked.
-        const locked = new Map(
-          (
-            await tx.query<{ id: string; status: "open" | "closed"; attention_since: Date | null }>(
-              `SELECT id, status, attention_since FROM cases
-                WHERE workspace_id = $1 AND id = ANY($2::uuid[])
-                ORDER BY id
-                FOR UPDATE`,
-              [ws, caseIds],
-            )
-          ).map((row) => [row.id, row]),
-        );
-        const latest = new Map(
-          (
-            await tx.query<{ case_id: string; assessment: string; attention: Attention | null }>(
-              `SELECT DISTINCT ON (case_id) case_id, assessment, attention
-                 FROM decisions
-                WHERE workspace_id = $1 AND case_id = ANY($2::uuid[])
-                ORDER BY case_id, decided_at DESC, run_id`,
-              [ws, caseIds],
-            )
-          ).map((row) => [row.case_id, row]),
-        );
-
-        const cases: CompleteResult["cases"] = [];
-        const updates = {
-          id: [] as string[],
-          status: [] as string[],
-          closed_at: [] as (string | null)[],
-          close_reason: [] as (string | null)[],
-          attention_since: [] as (string | null)[],
-        };
-        const decisions = {
-          case_id: [] as string[],
-          assessment: [] as string[],
-          attention: [] as (string | null)[],
-          basis: [] as string[],
-          cites: [] as string[],
-          status: [] as string[],
-          close_reason: [] as (string | null)[],
-        };
-
-        input.decisions.forEach((decision, index) => {
-          const caseId = caseIds[index];
-          const current = locked.get(caseId)!;
-          const before = latest.get(caseId);
-          const next = transition(
-            current,
-            before ? { assessment: before.assessment, attention: before.attention } : null,
-            decision,
-            labels[index],
-            now,
+        const inputs = await stepInputs(tx, run, true);
+        const at = iso(run.view_now);
+        if (viewOrNothing(inputs, at)?.basis !== run.view_basis) {
+          throw new Refusal(
+            "view_stale",
+            "The inputs of this run changed since its view; call view_run again and evaluate the new view.",
+            { run_id: run.id },
           );
-          updates.id.push(caseId);
-          updates.status.push(next.status);
-          updates.closed_at.push(next.closed_at ? iso(next.closed_at) : null);
-          updates.close_reason.push(next.close_reason);
-          updates.attention_since.push(next.attention_since ? iso(next.attention_since) : null);
+        }
 
-          decisions.case_id.push(caseId);
-          decisions.assessment.push(decision.assessment);
-          decisions.attention.push(decision.close || !decision.attention ? null : JSON.stringify(decision.attention));
-          decisions.basis.push(decision.basis);
-          decisions.cites.push(JSON.stringify(decision.cites ?? []));
-          decisions.status.push(decision.close ? "closed" : "open");
-          decisions.close_reason.push(decision.close?.reason ?? null);
+        const evaluation: Evaluation = {
+          basis: run.view_basis,
+          evaluator: run.agent.name,
+          proposals: input.evaluation.proposals,
+        };
+        let result: StepResult;
+        try {
+          result = step(inputs.definition, inputs.state, inputs.observations, evaluation, at);
+        } catch (error) {
+          if (error instanceof InputError) throw new Refusal("invalid_input", error.message, { run_id: run.id });
+          throw error;
+        }
 
-          cases.push({
-            subject: decision.subject,
-            status: next.status,
-            attention: next.attention,
-            attention_since: next.attention_since ? iso(next.attention_since) : null,
-          });
-        });
-
-        if (caseIds.length) {
+        // This run's observations, frozen: what later lookbacks and replays read.
+        const frozen = inputs.runObservations;
+        if (frozen.length) {
           await tx.query(
-            `INSERT INTO decisions
-               (workspace_id, run_id, case_id, assessment, attention, basis, cites, status, close_reason, decided_at)
-             SELECT $1, $2, t.case_id, t.assessment, t.attention::jsonb, t.basis,
-                    ARRAY(SELECT jsonb_array_elements_text(t.cites::jsonb)), t.status, t.close_reason, $10
-               FROM unnest($3::uuid[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[])
-                 AS t(case_id, assessment, attention, basis, cites, status, close_reason)`,
+            `INSERT INTO core_observations
+               (workspace_id, responsibility_id, id, kind, occurred_at, body, digest, run_id)
+             SELECT $1, $2, t.id, t.kind, t.occurred_at::timestamptz, t.body::jsonb, t.digest, $3
+               FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::text[])
+                 AS t(id, kind, occurred_at, body, digest)`,
             [
               ws,
+              run.responsibility_id,
               run.id,
-              decisions.case_id,
-              decisions.assessment,
-              decisions.attention,
-              decisions.basis,
-              decisions.cites,
-              decisions.status,
-              decisions.close_reason,
-              now,
+              frozen.map((o) => o.id),
+              frozen.map((o) => o.kind),
+              frozen.map((o) => o.occurred_at),
+              frozen.map((o) => JSON.stringify(o)),
+              frozen.map((o) => digest(o)),
             ],
-          );
-          await tx.query(
-            `UPDATE cases c
-                SET status = t.status, closed_at = t.closed_at::timestamptz,
-                    close_reason = t.close_reason, attention_since = t.attention_since::timestamptz
-               FROM unnest($2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[])
-                 AS t(id, status, closed_at, close_reason, attention_since)
-              WHERE c.workspace_id = $1 AND c.id = t.id`,
-            [ws, updates.id, updates.status, updates.closed_at, updates.close_reason, updates.attention_since],
           );
         }
 
-        const notDecided = (
-          await tx.query<{ subject: string }>(
-            `SELECT c.subject FROM observations o
-               JOIN cases c ON c.workspace_id = o.workspace_id AND c.id = o.case_id
-              WHERE o.workspace_id = $1 AND o.run_id = $2 AND NOT (o.case_id = ANY($3::uuid[]))
-              ORDER BY c.subject COLLATE "C"`,
-            [ws, run.id, caseIds],
-          )
-        ).map((row) => row.subject);
-
-        const result: CompleteResult = {
-          run_id: run.id,
-          outcome: input.outcome,
-          completed_at: iso(now),
-          cases,
-          not_decided: notDecided,
-          not_observed: await notObserved(tx, run.responsibility_id, run.id),
-        };
+        // Compare and set: the state is stored only if it is still the one read.
+        const written = inputs.stateDigest === null
+          ? await tx.query(
+              `INSERT INTO responsibility_states (workspace_id, responsibility_id, state, state_digest, updated_at)
+               VALUES ($1, $2, $3::jsonb, $4, $5)
+               ON CONFLICT DO NOTHING
+               RETURNING 1`,
+              [ws, run.responsibility_id, JSON.stringify(result.state), result.state_digest, completedAt],
+            )
+          : await tx.query(
+              `UPDATE responsibility_states SET state = $3::jsonb, state_digest = $4, updated_at = $5
+                WHERE workspace_id = $1 AND responsibility_id = $2 AND state_digest = $6
+                RETURNING 1`,
+              [ws, run.responsibility_id, JSON.stringify(result.state), result.state_digest, completedAt, inputs.stateDigest],
+            );
+        if (!written.length) {
+          throw new Refusal("state_conflict", "The responsibility's state changed while this run completed; retry.", {
+            run_id: run.id,
+          });
+        }
 
         await tx.query(
-          `UPDATE runs SET completed_at = $3, outcome = $4, summary = $5, report = $6, completion = $7::jsonb
-            WHERE workspace_id = $1 AND id = $2`,
-          [ws, run.id, now, input.outcome, input.summary ?? null, input.report ?? null, JSON.stringify(result)],
+          `INSERT INTO core_steps
+             (workspace_id, run_id, version_id, now, basis, observation_ids, evaluation, result,
+              state_digest_before, state_digest_after)
+           VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, $8::jsonb, $9, $10)`,
+          [
+            ws,
+            run.id,
+            run.version_id,
+            at,
+            run.view_basis,
+            inputs.observations.map((o) => o.id).sort(),
+            JSON.stringify(evaluation),
+            JSON.stringify({ ...result, state: undefined }), // the state itself is in responsibility_states
+            inputs.stateDigest,
+            result.state_digest,
+          ],
         );
-        return result;
+        const caseIds = new Set([
+          ...result.transitions.map((t) => t.case_id),
+          ...result.attention_events.map((e) => e.case_id),
+          ...evaluation.proposals.map((p) => caseIdOf(inputs.definition.id, p.subject)),
+        ]);
+        if (caseIds.size) {
+          await tx.query(
+            `INSERT INTO core_step_cases (workspace_id, case_id, run_id)
+             SELECT $1, c, $2 FROM unnest($3::text[]) AS c`,
+            [ws, run.id, [...caseIds]],
+          );
+        }
+
+        return finish({
+          run_id: run.id,
+          outcome: input.outcome,
+          completed_at: iso(completedAt),
+          basis: run.view_basis,
+          transitions: result.transitions,
+          attention_events: result.attention_events,
+          rejections: result.rejections,
+          state_digest: result.state_digest,
+        });
       });
     },
 
-    async getCase({ responsibility: key, subject, limit }) {
+    async getCase({ responsibility: key, keys, limit }) {
       const responsibility = await responsibilityByKey(driver, key, false);
-      const [found] = await driver.query<{
-        id: string;
-        subject: string;
-        status: "open" | "closed";
-        opened_at: Date;
-        closed_at: Date | null;
-        close_reason: string | null;
-        attention_since: Date | null;
-      }>(
-        `SELECT c.id, c.subject, c.status, c.opened_at, c.closed_at, c.close_reason, c.attention_since
-           FROM cases c
-          WHERE c.workspace_id = $1 AND c.responsibility_id = $2 AND lower(c.subject) = lower($3)
-            AND ${inBaseline("c")}`,
-        [ws, responsibility.id, subject],
-      );
+      const caseId = caseIdOf(responsibility.id, {
+        type: responsibility.definition.identity.subject_type,
+        keys,
+      });
+      const { state } = await loadState(driver, responsibility.id, false);
+      const found = state && Object.hasOwn(state.cases, caseId) ? state.cases[caseId] : undefined;
       if (!found) {
-        throw new Refusal("unknown_case", `${key} has no case ${subject} observed by a completed run.`, {
-          subject,
-        });
+        throw new Refusal("unknown_case", `${key} has no case with these keys.`, { keys });
       }
       const rows = await driver.query<
-        RunSummaryRow & {
-          observed_at: Date;
-          facts: Facts;
-          decided: boolean;
-          assessment: string | null;
-          attention: Attention | null;
-          basis: string | null;
-          cites: string[] | null;
-          decision_status: "open" | "closed" | null;
-          decision_close_reason: string | null;
-        }
+        RunSummaryRow & { now: Date; result: Omit<StepResult, "state">; evaluation: Evaluation }
       >(
-        `SELECT ${RUN_SUMMARY_COLUMNS}, o.observed_at, o.facts,
-                (d.case_id IS NOT NULL) AS decided, d.assessment, d.attention, d.basis, d.cites,
-                d.status AS decision_status, d.close_reason AS decision_close_reason
-           FROM observations o
-           JOIN runs r ON r.workspace_id = o.workspace_id AND r.id = o.run_id
+        `SELECT ${RUN_SUMMARY_COLUMNS}, s.now, s.result, s.evaluation
+           FROM core_step_cases sc
+           JOIN core_steps s ON s.workspace_id = sc.workspace_id AND s.run_id = sc.run_id
+           JOIN runs r ON r.workspace_id = s.workspace_id AND r.id = s.run_id
            ${RUN_SUMMARY_JOINS}
-           LEFT JOIN decisions d
-             ON d.workspace_id = o.workspace_id AND d.run_id = o.run_id AND d.case_id = o.case_id
-          WHERE o.workspace_id = $1 AND o.case_id = $2 AND r.outcome IN ${COMPLETED}
-          ORDER BY r.completed_at DESC, r.id
-          LIMIT $3`,
-        [ws, found.id, limit],
+          WHERE sc.workspace_id = $1 AND sc.case_id = $2 AND r.responsibility_id = $3
+          ORDER BY r.completed_at DESC
+          LIMIT $4`,
+        [ws, caseId, responsibility.id, limit],
       );
       return {
-        subject: found.subject,
-        status: found.status,
-        opened_at: iso(found.opened_at),
-        closed_at: found.closed_at ? iso(found.closed_at) : null,
-        close_reason: found.close_reason,
-        attention_since: found.attention_since ? iso(found.attention_since) : null,
-        history: rows.map((row) => ({
-          run: runSummary(row),
-          observed_at: iso(row.observed_at),
-          facts: row.facts,
-          decision: row.decided
-            ? {
-                assessment: row.assessment!,
-                attention: row.attention,
-                basis: row.basis!,
-                cites: row.cites ?? [],
-                status: row.decision_status!,
-                close_reason: row.decision_close_reason,
-              }
-            : null,
-        })),
+        ...caseSummary(caseId, found),
+        history: rows.map((row) => {
+          const proposal =
+            row.evaluation.proposals.find((p) => caseIdOf(responsibility.id, p.subject) === caseId) ?? null;
+          return {
+            run: runSummary(row),
+            at: iso(row.now),
+            transitions: row.result.transitions.filter((t) => t.case_id === caseId),
+            attention_events: row.result.attention_events.filter((e) => e.case_id === caseId),
+            proposal,
+            cited: proposal ? [...proposal.cites].sort() : [],
+          };
+        }),
       };
     },
   };
 }
 
+function ref(row: { id: string; kind: string; occurred_at: Date }): ObservationRef {
+  return { id: row.id, kind: row.kind, occurred_at: iso(row.occurred_at) };
+}
+
 function iso(value: Date | string): string {
   return (value instanceof Date ? value : new Date(value)).toISOString();
 }
-
-export type { FactValue };

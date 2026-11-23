@@ -1,0 +1,61 @@
+name: Check
+
+# The core and the MCP together: since the MCP bundles the core's sources, a core
+# change reaches production without a version boundary (docs: mcp/docs/core-integration-plan.md §6.2).
+on:
+  push:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "fixtures/**"
+      - "simulation/**"
+      - "mcp/**"
+      - "package*.json"
+      - ".github/workflows/check.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "fixtures/**"
+      - "simulation/**"
+      - "mcp/**"
+      - "package*.json"
+      - ".github/workflows/check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      # A throwaway database for test:pg, never anything else.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: rm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Core
+        run: npm ci && npm test
+      - name: MCP
+        working-directory: mcp
+        run: npm ci && npm run check
+      - name: MCP on Postgres
+        working-directory: mcp
+        env:
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/rm_test
+        run: npm run test:pg

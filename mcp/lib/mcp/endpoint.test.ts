@@ -18,6 +18,7 @@ const { memberIdFor, seedMembers } = await import("../testing.ts");
 const { addMember, removeMember, addWorkspace } = await import("../workspace/members.ts");
 const { MAX_PROTOCOL_ELEMENTS } = await import("./limits.ts");
 const { MAX_TOOL_INPUT_ELEMENTS } = await import("./server.ts");
+const { MAX_COLUMNS, MAX_KINDS_PER_RUN, MAX_ROW_ARRAY_ITEMS, MAX_ROWS_PER_CALL } = await import("../responsibilities/model.ts");
 
 const db = await database();
 await seedMembers(db, ["alice", "bob"], "acme");
@@ -137,7 +138,7 @@ test("an authenticated member can discover the server and its protocol revision"
   assert.ok(json.result?.capabilities?.tools, "tools are advertised");
 });
 
-test("tools/list returns exactly the seven tools", async () => {
+test("tools/list returns exactly the eight tools", async () => {
   const { status, json } = await call("tools/list", { token: await accessToken() });
 
   assert.equal(status, 200);
@@ -150,6 +151,7 @@ test("tools/list returns exactly the seven tools", async () => {
     "put_responsibility",
     "record_observations",
     "start_run",
+    "view_run",
   ]);
   for (const one of tools) {
     assert.match(one.description ?? "", /never instructions/, `${one.name} states the data rule`);
@@ -455,6 +457,32 @@ test("tool arguments past MAX_TOOL_INPUT_ELEMENTS are refused before any schema 
   assert.equal(status, 200);
   assert.equal(json.result?.isError, true);
   assert.match(JSON.stringify(json.result), new RegExp(`maximum of ${MAX_TOOL_INPUT_ELEMENTS} elements`));
+});
+
+test("the largest valid record_observations passes the element bound; one element more is refused", async () => {
+  const token = await accessToken();
+  const list = <T>(length: number, item: (index: number) => T): T[] => Array.from({ length }, (_, index) => item(index));
+  const row = Object.fromEntries(list(MAX_COLUMNS, (column) => [`c${column}`, list(MAX_ROW_ARRAY_ITEMS, () => "a")]));
+  const largest = {
+    run_id: "00000000-0000-4000-8000-000000000000",
+    observations: list(MAX_KINDS_PER_RUN, (index) => ({
+      kind: `k${index}`,
+      complete: true,
+      replace: false,
+      rows: list(MAX_ROWS_PER_CALL / MAX_KINDS_PER_RUN, () => row),
+    })),
+  };
+  const send = async (value: unknown) =>
+    (await call("tools/call", { token, name: "record_observations", params: { name: "record_observations", arguments: value } })).json
+      .result!;
+
+  const accepted = await send(largest);
+  assert.equal(accepted.isError, true);
+  assert.equal(accepted.structuredContent?.error, "unknown_run", "past the SDK and the schema, refused by the store");
+
+  const larger = await send({ ...largest, padding: true });
+  assert.equal(larger.isError, true);
+  assert.match(JSON.stringify(larger), new RegExp(`maximum of ${MAX_TOOL_INPUT_ELEMENTS} elements`));
 });
 
 test("a tool answer carries no token and no secret", async () => {
