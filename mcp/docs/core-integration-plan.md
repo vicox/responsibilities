@@ -768,8 +768,12 @@ Festgelegt bei der Umsetzung, im Rahmen der Abschnitte oben:
 - **Packaging:** Variante A (Quellen-Import über `mcp/lib/core.ts`, `turbopack.root` und
   `outputFileTracingRoot` auf dem Repository-Root). `tsc` und lokaler `next build` grün; der Core
   wird in die Chunks gebündelt, im Trace liegt keine Datei außerhalb von `mcp/`, PGlite nur als
-  Externals-Link ohne Paketdateien. **Offen:** Vercel-Preview-Build und die Einstellung „Include
-  source files outside of the Root Directory“ (§6.1, §12.1); bei Fehlschlag gilt Variante B.
+  Externals-Link ohne Paketdateien.
+  **Gate vor dem Merge (P0 noch nicht abgeschlossen):** Ein Vercel-Preview-Build ist ein
+  Deployment und war in dieser Umsetzung ausgeschlossen; der Auftraggeber koordiniert ihn. Zu
+  prüfen sind: die Einstellung „Include source files outside of the Root Directory“ (§12.1), ein
+  grüner Preview-Build, Function-Trace wie lokal (keine PGlite-Dateien, Wachstum nur um den
+  gebündelten Core). Scheitert ein Kriterium, wird vor dem Merge auf Variante B umgestellt.
 - **`view_run`** liefert die `View` des Core unverändert.
 - **`record_observations`:** Mehrere Einträge derselben Art in einem Aufruf werden der Reihe
   nach angewendet. Die 200 Zeilen gelten für den ganzen Aufruf (`call_too_large`). Die Grenzen
@@ -792,6 +796,9 @@ Festgelegt bei der Umsetzung, im Rahmen der Abschnitte oben:
   des Vorschlags für diesen Fall, sortiert.
 - **Lookback (b):** Zuerst werden `id`, `kind` und `occurred_at` aller Evidenz offener Fälle
   gelesen, dann nur die Rümpfe der gewählten Beobachtungen.
+- **`runs.completed_at`** einer Fertigstellung liegt strikt nach der vorigen Fertigstellung
+  derselben Responsibility, auch wenn die Host-Uhr zurückläuft. `last_run` und die Historie in
+  `get_case` folgen damit der Reihenfolge der Steps (wie `view_now`, §4.3).
 
 Tests: P0 `mcp/lib/core.test.ts`; P1 `host.test.ts`, `model.test.ts`; P2 `store.test.ts`,
 `two-runs.test.ts` (über den MCP-Endpunkt), `mcp/lib/db/migrate.test.ts`, `endpoint.test.ts`,

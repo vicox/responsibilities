@@ -616,6 +616,40 @@ test("P2-T13 a host clock that goes back behind state.now breaks nothing: view_n
   }
 });
 
+test("P2-T13 after the clock went back, completions keep their order: last_run and get_case follow the steps", async () => {
+  const w = await world();
+  try {
+    const store = w.storeFor("alice");
+    await store.putResponsibility(DEFINITION);
+    const one = await start(store);
+    await record(store, one.run_id, [listed("bugcrowd", [{ submission: "7f3c" }])]);
+    const first = await judge(store, one.run_id, [{ subject: submission("7f3c"), status: "open", cites: [`${one.run_id}:bugcrowd`] }]);
+
+    // The clock goes back an hour; run two records nothing and updates the case on lookback evidence.
+    w.advance(-HOUR);
+    const two = await start(store);
+    const second = await judge(store, two.run_id, [
+      { subject: submission("7f3c"), status: "open", cites: [`${one.run_id}:bugcrowd`], summary: "still listed" },
+    ]);
+    assert.deepEqual(second.transitions.map((t) => t.kind), ["updated"]);
+    assert.ok(second.completed_at > first.completed_at, `${second.completed_at} after ${first.completed_at}`);
+
+    assert.equal((await store.getResponsibility(DEFINITION.key)).last_run?.run_id, two.run_id);
+    const history = await store.getCase({ responsibility: DEFINITION.key, keys: { submission: "7f3c" }, limit: 10 });
+    assert.deepEqual(history.history.map((h) => h.run.run_id), [two.run_id, one.run_id]);
+    assert.equal(history.summary, "still listed");
+
+    // A failed run completes after them too.
+    w.advance(-HOUR);
+    const three = await start(store);
+    const failed = await store.completeRun({ run_id: three.run_id, outcome: "failed", summary: "down" });
+    assert.ok(failed.completed_at > second.completed_at);
+    assert.equal((await store.getResponsibility(DEFINITION.key)).last_run?.run_id, three.run_id);
+  } finally {
+    await w.close();
+  }
+});
+
 // --- P2-T6 rejections are data --------------------------------------------------------
 
 test("P2-T6 the core's rejections come back as data; the run completes", async () => {
@@ -811,8 +845,10 @@ test("P2-T7/P2-T8 stored observations and states keep their digests; every step 
     }>(
       `SELECT s.run_id, v.definition, s.now, s.basis, s.observation_ids, s.evaluation,
               s.state_digest_before AS before, s.state_digest_after AS after
-         FROM core_steps s JOIN responsibility_versions v ON v.workspace_id = s.workspace_id AND v.id = s.version_id
-        ORDER BY s.now`,
+         FROM core_steps s
+         JOIN responsibility_versions v ON v.workspace_id = s.workspace_id AND v.id = s.version_id
+         JOIN runs r ON r.workspace_id = s.workspace_id AND r.id = s.run_id
+        ORDER BY r.completed_at`,
     );
     assert.deepEqual(steps.map((s) => s.run_id), [one.run_id, two.run_id, three.run_id]);
     assert.deepEqual(steps.map((s) => s.definition.version), [1, 2, 2]);

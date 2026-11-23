@@ -845,11 +845,22 @@ export function responsibilityStore(
         if (run.completion) return { ...run.completion, already_completed: true as const };
         refuseIfExpired(run, now);
 
+        // The completion order, which last_run and get_case read, is the order of the
+        // steps: strictly after the responsibility's previous completion, even if the
+        // host clock went back. Completions of one responsibility never overlap — only
+        // its one open run can complete, and this transaction holds it.
+        const [{ previous }] = await tx.query<{ previous: Date | null }>(
+          `SELECT max(completed_at) AS previous FROM runs
+            WHERE workspace_id = $1 AND responsibility_id = $2 AND outcome IN ${COMPLETED}`,
+          [ws, run.responsibility_id],
+        );
+        const completedAt = previous && previous >= now ? new Date(previous.getTime() + 1) : now;
+
         const finish = async (result: CompleteResult) => {
           await tx.query(
             `UPDATE runs SET completed_at = $3, outcome = $4, summary = $5, report = $6, completion = $7::jsonb
               WHERE workspace_id = $1 AND id = $2`,
-            [ws, run.id, now, input.outcome, input.summary ?? null, input.report ?? null, JSON.stringify(result)],
+            [ws, run.id, completedAt, input.outcome, input.summary ?? null, input.report ?? null, JSON.stringify(result)],
           );
           return result;
         };
@@ -866,7 +877,7 @@ export function responsibilityStore(
           return finish({
             run_id: run.id,
             outcome: "failed",
-            completed_at: iso(now),
+            completed_at: iso(completedAt),
             basis: null,
             transitions: [],
             attention_events: [],
@@ -950,13 +961,13 @@ export function responsibilityStore(
                VALUES ($1, $2, $3::jsonb, $4, $5)
                ON CONFLICT DO NOTHING
                RETURNING 1`,
-              [ws, run.responsibility_id, JSON.stringify(result.state), result.state_digest, now],
+              [ws, run.responsibility_id, JSON.stringify(result.state), result.state_digest, completedAt],
             )
           : await tx.query(
               `UPDATE responsibility_states SET state = $3::jsonb, state_digest = $4, updated_at = $5
                 WHERE workspace_id = $1 AND responsibility_id = $2 AND state_digest = $6
                 RETURNING 1`,
-              [ws, run.responsibility_id, JSON.stringify(result.state), result.state_digest, now, inputs.stateDigest],
+              [ws, run.responsibility_id, JSON.stringify(result.state), result.state_digest, completedAt, inputs.stateDigest],
             );
         if (!written.length) {
           throw new Refusal("state_conflict", "The responsibility's state changed while this run completed; retry.", {
@@ -998,7 +1009,7 @@ export function responsibilityStore(
         return finish({
           run_id: run.id,
           outcome: input.outcome,
-          completed_at: iso(now),
+          completed_at: iso(completedAt),
           basis: run.view_basis,
           transitions: result.transitions,
           attention_events: result.attention_events,
@@ -1028,7 +1039,7 @@ export function responsibilityStore(
            JOIN runs r ON r.workspace_id = s.workspace_id AND r.id = s.run_id
            ${RUN_SUMMARY_JOINS}
           WHERE sc.workspace_id = $1 AND sc.case_id = $2 AND r.responsibility_id = $3
-          ORDER BY s.now DESC, r.completed_at DESC, r.id
+          ORDER BY r.completed_at DESC
           LIMIT $4`,
         [ws, caseId, responsibility.id, limit],
       );
