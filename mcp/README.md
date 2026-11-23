@@ -6,11 +6,18 @@ how each case was judged and what still needs attention — so an independent ag
 next run starts from the last one. The service owns the record; the agent reads its
 own sources and judges. No LLM, connector, scheduler or website in the service.
 
-Design and decisions: [docs/implementation-plan.md](docs/implementation-plan.md).
+It is the host of [responsibilities-core](../README.md): every decision about cases,
+status and Attentions is the core's `view` and `step`; the service keeps auth,
+workspaces, runs, storage, the lookback and the clock.
+
+Design and decisions: [docs/core-integration-plan.md](docs/core-integration-plan.md) (the
+core integration, tools and data model) and [docs/implementation-plan.md](docs/implementation-plan.md)
+(auth, workspaces, runs, operations).
 
 This service lives in `mcp/` of the [responsibilities](../README.md) repository. It is
 a standalone package with its own `package.json` and lockfile, not part of the root
-`responsibilities-core` package and not an npm workspace. Run every `npm` command below
+`responsibilities-core` package and not an npm workspace. It bundles the core's sources
+from `../src` through `lib/core.ts`, its only import of them. Run every `npm` command below
 from `mcp/`; the Vercel CLI runs from the repository root (see Deploy).
 
 ## Shape
@@ -21,17 +28,18 @@ from `mcp/`; the Vercel CLI runs from the repository root (see Deploy).
 - OAuth 2.1 authorization server for MCP clients (DCR, PKCE S256, rotating refresh
   tokens), Google as identity provider, admission by **workspace membership**.
 - PostgreSQL (Neon in production, embedded PGlite in development and tests).
-- Seven deterministic tools:
+- Eight deterministic tools:
 
 | Tool | Does |
 | --- | --- |
 | `get_server_info` | workspace, member and client of this session |
-| `put_responsibility` | define or version a responsibility (expectation, subject type, assessment vocabulary) |
-| `get_responsibility` | current version, last completed run, run in progress, open cases |
-| `start_run` | start a run (one open per responsibility, 2 h lifetime; one idle 10 min is taken over) and get the baseline |
-| `record_observations` | facts per subject (≤ 200/call, ≤ 1000/run); returns the diff to the previous observation |
-| `complete_run` | decisions per subject; updates cases and attention atomically; replayable |
-| `get_case` | one case's history over completed runs |
+| `put_responsibility` | define or version a responsibility: a title and a core definition (identity, expectations, included kinds, closing criteria, Attention types), checked by the core |
+| `get_responsibility` | current version and definition, last completed run, run in progress, open cases from the core's state |
+| `start_run` | start a run (one open per responsibility, 2 h lifetime; one idle 10 min is taken over); returns the kinds to collect, Attention types and open cases |
+| `record_observations` | rows per observation kind, one observation `<run_id>:<kind>` per run (≤ 200 rows/call, ≤ 1000 per kind, ≤ 10 kinds) |
+| `view_run` | the core's view of the run and its `basis` — what the agent judges |
+| `complete_run` | the evaluation `{basis, proposals}`, applied by the core's `step`; rejections are data; replayable |
+| `get_case` | one case, by its subject keys, and the completed runs that touched it |
 
 No tool takes a workspace or member argument: the session is bound from the access
 token before any tool exists.
@@ -109,8 +117,9 @@ npm run test:pg
 Not provisioned by this repository. Rules:
 
 1. Neon project, database `responsibilities`; Vercel project (Next.js, Node 22/24,
-   **Root Directory `mcp`**), function region next to Neon; production domain **not**
-   behind Vercel Deployment Protection.
+   **Root Directory `mcp`**, with **"Include source files outside of the Root Directory"**
+   enabled: the build bundles `../src`), function region next to Neon; production domain
+   **not** behind Vercel Deployment Protection.
 2. Env vars from `.env.example` as encrypted Vercel variables scoped to **Production**
    (app uses Neon's pooled URL). Previews get none and fail closed.
 3. Before every deploy: `npm run check`; before the first deploy and after any locking
@@ -118,8 +127,10 @@ Not provisioned by this repository. Rules:
 4. `DATABASE_URL=<direct url> npm run db:migrate`, **then** deploy: Git integration, or
    `vercel link` and `vercel deploy --prod` from the repository root, not from `mcp/`
    (Vercel applies the Root Directory `mcp` itself). Production never migrates from a
-   request. MVP migrations only add; a destructive one follows stop → backup → migrate →
-   deploy.
+   request. Exception: `responsibilities` v3 (clean slate, discards every domain row and
+   keeps workspaces, members and OAuth) is cut over the other way round — deploy, rule out
+   Skew Protection, drain, then migrate — as in
+   [core-integration-plan.md §9.2](docs/core-integration-plan.md).
 5. Create the workspace and members with `npm run admin` against the production URL.
 6. Smoke: both discovery documents answer; unauthenticated `POST /mcp` → 401 with
    `resource_metadata`; Claude Code connects and `get_server_info` names the workspace;

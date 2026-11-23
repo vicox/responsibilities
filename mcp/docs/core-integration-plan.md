@@ -1,6 +1,8 @@
 # Plan: responsibilities-core als einzige Decision Engine im Responsibilities MCP
 
-Status: **Plan, nicht implementiert.** Version 3, 2026-11-23.
+Status: **Umgesetzt (P0–P3), Schnitt (P4) steht aus.** Version 3, 2026-11-23, freigegeben als
+`39cd0ee`. Umsetzung: Branch `responsibilities-core-mcp-integration`; was der Plan offen ließ,
+steht in §13. Keine Produktionsmigration, kein Deployment.
 
 **Produktentscheidung des Auftraggebers (2026-11-23):** Der MCP wurde bisher nur einmal für zwei
 Responsibilities genutzt. Alle bisherigen Domänendaten (Responsibilities, Versionen, Runs, Fälle,
@@ -11,10 +13,9 @@ bleiben unverändert.
 Version 2 (`1c84c15`) war freigegeben. Version 3 ändert Migration, Schnitt und Rückweg materiell.
 
 Zielrepository: `vicox/responsibilities` auf `origin/main` = `84f47dd`. Alle Pfade unten sind
-relativ zu diesem Repository (`src/` = Core, `mcp/` = MCP-Server). Diese Datei liegt zum Review im
-Worktree `responsibilities-mcp-impl`. Bei Umsetzungsbeginn wandert sie nach
-`mcp/docs/core-integration-plan.md` und ersetzt dort Entscheidung D11
-(`mcp/docs/implementation-plan.md:678`).
+relativ zu diesem Repository (`src/` = Core, `mcp/` = MCP-Server). Diese Datei ersetzt
+Entscheidung D11 (`mcp/docs/implementation-plan.md`, §14). Zeilenangaben beziehen sich auf den
+Stand `84f47dd` vor der Umsetzung.
 
 Grundlage sind die vorangegangenen Analysen: Nutzung des Core (keine), Integrationsweg, und die
 Prüfung Tool für Tool. Kennzeichnung: **[F]** = im Code belegt, ohne Kennzeichnung = Entscheidung
@@ -757,3 +758,42 @@ Review. Es gibt keine Pflicht-Reviews pro Phase.
 2. **Status-Skill** (`claude-plugins`, INF-Ticket). Er folgt nach dem Schnitt mit den neuen
    Verträgen: Zeilen pro Quelle, `view_run`, Zitate, Closing-Regeln statt „letzte Entscheidung
    `nothing_due`“ (`mcp/docs/implementation-plan.md:566–570`). Er ist nicht Teil dieses Plans.
+
+---
+
+## 13. Umsetzung: was der Plan offen ließ
+
+Festgelegt bei der Umsetzung, im Rahmen der Abschnitte oben:
+
+- **Packaging:** Variante A (Quellen-Import über `mcp/lib/core.ts`, `turbopack.root` und
+  `outputFileTracingRoot` auf dem Repository-Root). `tsc` und lokaler `next build` grün; der Core
+  wird in die Chunks gebündelt, im Trace liegt keine Datei außerhalb von `mcp/`, PGlite nur als
+  Externals-Link ohne Paketdateien. **Offen:** Vercel-Preview-Build und die Einstellung „Include
+  source files outside of the Root Directory“ (§6.1, §12.1); bei Fehlschlag gilt Variante B.
+- **`view_run`** liefert die `View` des Core unverändert.
+- **`record_observations`:** Mehrere Einträge derselben Art in einem Aufruf werden der Reihe
+  nach angewendet. Die 200 Zeilen gelten für den ganzen Aufruf (`call_too_large`). Die Grenzen
+  von 1000 Zeilen pro Art und 10 Arten pro Run melden `run_too_large`. Zeilen, die eine Grenze
+  verletzen, U+0000 oder ungepaarte Surrogate enthalten (Postgres speichert sie nicht, `digest`
+  hasht sie nicht), werden mit `invalid_row` verweigert; nicht-NFC mit `not_nfc`.
+- **`Observation.subjects`** werden aus Spalten gebildet, die genau wie ein Subjektschlüssel
+  heißen und einen Text oder eine ganze Zahl tragen (beschreibend; der Core liest sie nicht).
+- **Text, den Postgres nicht speichern kann** (U+0000, ungepaarte Surrogate), in Titel,
+  Definition, Zusammenfassung, Bericht oder Evaluation: `invalid_text`, bevor etwas geschrieben
+  wird.
+- **`complete_run`:** fehlende Evaluation bei `completed`/`partial` → `evaluation_required`,
+  Evaluation bei `failed` → `evaluation_forbidden`. Ein `failed`-Ergebnis hat `basis: null` und
+  `state_digest: null`. Abgeschlossene Runs verweigern `record_observations` und `view_run` mit
+  `run_completed` wie bisher.
+- **`core_steps.result`** ist das `StepResult` ohne `state`; der State steht in
+  `responsibility_states`, Replay fädelt ihn neu (P2-T8).
+- **`start_run`:** `run_limit` = Zeilen pro Art und Run (1000). Ausgabe sonst wie §3.4.
+- **`get_case`:** `attentions` wie bei `get_responsibility` (nur offene); `cited` = die `cites`
+  des Vorschlags für diesen Fall, sortiert.
+- **Lookback (b):** Zuerst werden `id`, `kind` und `occurred_at` aller Evidenz offener Fälle
+  gelesen, dann nur die Rümpfe der gewählten Beobachtungen.
+
+Tests: P0 `mcp/lib/core.test.ts`; P1 `host.test.ts`, `model.test.ts`; P2 `store.test.ts`,
+`two-runs.test.ts` (über den MCP-Endpunkt), `mcp/lib/db/migrate.test.ts`, `endpoint.test.ts`,
+`limits.test.ts`; P3 `concurrency.pg.test.ts` (Wegwerf-Postgres) und Root `npm test`. CI:
+`.github/workflows/check.yml`.
