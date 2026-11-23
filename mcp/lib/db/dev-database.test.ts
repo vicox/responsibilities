@@ -43,7 +43,7 @@ test("with no configuration, a member added by the admin CLI is admitted by the 
   const cli = (script: string, ...args: string[]) =>
     execFileSync(process.execPath, [join(ROOT, script), ...args], { cwd: scratch, env, encoding: "utf8" });
 
-  assert.match(cli("lib/db/migrate-cli.ts", "--embedded"), /Applied 4 migration\(s\) \(\.devdb\)/);
+  assert.match(cli("lib/db/migrate-cli.ts", "--embedded"), /Applied 5 migration\(s\) \(\.devdb\)/);
   cli("scripts/admin.ts", "--embedded", "workspace:add", "devco", "Dev Co");
   cli("scripts/admin.ts", "--embedded", "member:add", "devco", "local@example.com");
   assert.ok(existsSync(join(scratch, ".devdb")), "the CLI wrote the default directory");
