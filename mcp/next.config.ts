@@ -4,15 +4,18 @@ import type { NextConfig } from "next";
 const NO_STORE = [{ key: "cache-control", value: "private, no-store, max-age=0, must-revalidate" }];
 
 /**
- * This directory, not the repository root: the app lives in `mcp/` beside another
- * package with its own lockfile, and Next.js would otherwise take the outermost
- * lockfile's directory as the workspace root for bundling and file tracing.
+ * The repository root, not this directory: the app bundles the sources of
+ * responsibilities-core from `../src` (`lib/core.ts`, the only import of them),
+ * and Turbopack resolves and traces no file outside its root. Set explicitly so
+ * Next.js does not guess a root from whichever lockfile it finds first. On
+ * Vercel (Root Directory `mcp`) this needs "Include source files outside of the
+ * Root Directory" enabled.
  */
-const APP_ROOT = fileURLToPath(new URL(".", import.meta.url));
+const REPOSITORY_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 const nextConfig: NextConfig = {
-  turbopack: { root: APP_ROOT },
-  outputFileTracingRoot: APP_ROOT,
+  turbopack: { root: REPOSITORY_ROOT },
+  outputFileTracingRoot: REPOSITORY_ROOT,
 
   /**
    * PGlite (embedded Postgres, development and tests only) stays out of the
