@@ -174,8 +174,7 @@ check(page.meta.get("og:url") == [SITE], f"index.html: og:url must be {SITE}")
 # nothing else. The title, og:title and footers carry the claim; the description and
 # og:description stand alone in a search result or a shared link, so they say a little more.
 H1 = "Persistent Responsibilities for AI Agents"
-SUBHEAD = ("Give AI agents something to own beyond a single task — "
-           "with persistent context, evidence, and decisions across runs.")
+SUBHEAD = "Give AI agents something to own beyond a single task."
 TITLE = "Persistent Responsibilities for AI Agents — responsibilities.dev"
 OG_TITLE = H1
 DESCRIPTION = ("Give AI agents something to own beyond a single task: a lasting expectation, judged run after run, "
